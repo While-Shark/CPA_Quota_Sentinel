@@ -24,7 +24,7 @@ func validateManagementPath(path string) (string, error) {
 // managementConfigFields 声明 CPA 原生配置弹窗支持的后台入口字段。
 func managementConfigFields() []pluginapi.ConfigField {
 	return []pluginapi.ConfigField{{Name: "management_path", Type: pluginapi.ConfigFieldTypeString, Default: managementBasePath,
-		Description: "自定义后台路径，例如 /sentinel-secret。保存插件配置后生效；原路径立即失效。后台仍需 CPA 管理密钥。"}}
+		Description: "自定义后台路径，例如 /sentinel-secret。留空时使用默认路径 " + managementBasePath + "。保存插件配置后生效；原路径立即失效。后台仍需 CPA 管理密钥。管理页内提供路径跳转按钮。"}}
 }
 
 // configuredManagementPath 返回经过校验的管理路由基址。

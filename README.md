@@ -78,7 +78,7 @@ Upstream release downloads contain upstream code, not this repository's changes.
 
 ## Upstream release history
 
-v0.4.2 includes the CPA_Quota_Sentinel project identity and store registry.
+v0.4.3 displays the CPA_Quota_Sentinel name and adds a management path shortcut.
 Full release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## How Scheduling Works
@@ -304,7 +304,7 @@ Keep this setting disabled unless you understand and accept that risk.
 
 CPA's Plugin Store reads plugin catalogs from `registry.json` sources and downloads release archives from GitHub Releases.
 
-1. Publish a GitHub Release tag (for example `v0.4.2`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
+1. Publish a GitHub Release tag (for example `v0.4.3`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
 2. Add this repository's `registry.json` to `plugins.store-sources` in CPA's `config.yaml`:
 
 ```yaml
@@ -314,7 +314,7 @@ plugins:
     - "https://raw.githubusercontent.com/While-Shark/CPA_Quota_Sentinel/master/registry.json"
 ```
 
-3. Open CPA's Plugin Store in the WebUI, search for **CPA Quota Sentinel** (source: `raw.githubusercontent.com`), and click **Install**.
+3. Open CPA's Plugin Store in the WebUI, search for **CPA_Quota_Sentinel** (source: `raw.githubusercontent.com`), and click **Install**.
 
 ### Method 2: Manual / Local Installation
 
@@ -534,8 +534,8 @@ make build
 Build release archives and checksums:
 
 ```bash
-make package VERSION=0.4.2
-make checksums VERSION=0.4.2
+make package VERSION=0.4.3
+make checksums VERSION=0.4.3
 ```
 
 Windows users can build `dist/codex-quota-scheduler.dll` with:
@@ -554,8 +554,8 @@ Before tagging, record the release in `CHANGELOG.md` and bump the version
 strings in `config.go`, `Makefile`, and both READMEs.
 
 ```bash
-git tag -a v0.4.2 -m "v0.4.2"
-git push origin v0.4.2
+git tag -a v0.4.3 -m "v0.4.3"
+git push origin v0.4.3
 ```
 
 Release archives use this naming scheme:

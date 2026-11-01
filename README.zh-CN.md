@@ -74,7 +74,7 @@ CPA 的插件配置弹窗不支持原生动作按钮，“打开后台”链接�
 
 ## 上游版本记录
 
-v0.4.2 更新 CPA_Quota_Sentinel 项目名称并加入插件商店索引。
+v0.4.3 更新插件展示名称，并在管理页加入后台路径快捷入口。
 完整更新历史见 [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)。
 
 ## 调度逻辑
@@ -261,7 +261,7 @@ CPA 无法确认当前 Codex 账号列表和优先级时，普通刷新和新周
 
 CPA 插件商店通过读取 `registry.json` 索引源，并从对应 GitHub 仓库的 Releases 下载安装包。
 
-1. 在 GitHub 仓库推送 `v*` 版本标签（例如 `v0.4.2`），触发 GitHub Actions 自动编译各平台 `.zip` 包与 `checksums.txt` 并发布到 GitHub Releases。
+1. 在 GitHub 仓库推送 `v*` 版本标签（例如 `v0.4.3`），触发 GitHub Actions 自动编译各平台 `.zip` 包与 `checksums.txt` 并发布到 GitHub Releases。
 2. 在 CPA 的 `config.yaml` 中将本仓库的 `registry.json` 加入 `plugins.store-sources`：
 
 ```yaml
@@ -271,7 +271,7 @@ plugins:
     - "https://raw.githubusercontent.com/While-Shark/CPA_Quota_Sentinel/master/registry.json"
 ```
 
-3. 打开 CPA 管理后台的插件商店，搜索 **CPA Quota Sentinel**（注意选择自定义源），点击安装即可。
+3. 打开 CPA 管理后台的插件商店，搜索 **CPA_Quota_Sentinel**（注意选择自定义源），点击安装即可。
 
 ### 方式二：手动安装 / 本地编译安装
 
@@ -473,8 +473,8 @@ make build
 构建发布压缩包和校验文件：
 
 ```bash
-make package VERSION=0.4.2
-make checksums VERSION=0.4.2
+make package VERSION=0.4.3
+make checksums VERSION=0.4.3
 ```
 
 Windows 用户可以用以下命令构建 `dist/codex-quota-scheduler.dll`：
@@ -492,8 +492,8 @@ Windows 用户可以用以下命令构建 `dist/codex-quota-scheduler.dll`：
 `config.go`、`Makefile` 和两份 README 中的版本字符串。
 
 ```bash
-git tag -a v0.4.2 -m "v0.4.2"
-git push origin v0.4.2
+git tag -a v0.4.3 -m "v0.4.3"
+git push origin v0.4.3
 ```
 
 发布包使用以下命名方式：

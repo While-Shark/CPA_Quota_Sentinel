@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Codex 额度调度器</title>
+<title>CPA_Quota_Sentinel</title>
 <style>
 /* ====================================================================
    CODEX QUOTA SCHEDULER — DESIGN SYSTEM / SINGLE FILE / NO CDN
@@ -152,6 +152,8 @@ code,.mono,.number{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation 
 .data-table .fields{color:var(--muted);font-size:10.5px;line-height:1.8}
 .table-footer{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
 .settings-note{margin-bottom:18px}
+.management-entry-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:7px 0}
+.management-entry-row code{overflow-wrap:anywhere}
 .settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:16px}
 .settings-col{display:grid;align-content:start;gap:16px;min-width:0}
 .settings-panel{overflow:hidden}
@@ -279,7 +281,7 @@ code,.mono,.number{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation 
 <input id="importFile" class="hidden" type="file" accept="application/json,.json">
 <script>
 'use strict';
-/* Codex Quota Scheduler management UI.
+/* CPA_Quota_Sentinel management UI.
    Visual system and render layer: codex-ui-handoff prototype (design team),
    adapted to the live v4 management API. API layer, authorization, polling,
    and save isolation semantics are carried over from the previous revision. */
@@ -429,7 +431,7 @@ function validateRetry(draft){const a=draft.advanced;if(draft.mode==='on'&&draft
 function renderSidebar(){
  const nav=[['overview','grid',['账号总览','Overview']],['logs','logs',['日志','Logs']],['settings','settings',['调度设置','Scheduling']],['retry','retry',['模型重试链','Model retry chains']]];
  return `<aside class="sidebar">
- <div class="brand"><div class="brand-mark" aria-hidden="true"><svg width="25" height="25" viewBox="0 0 40 25" fill="none"><path d="M19 12.5C11 1 4 4 4 12.5S11 24 19 12.5 34 1 36 12.5s-7 11-17 0" stroke="white" stroke-width="4.2" stroke-linecap="round"/></svg></div><div><div class="brand-title">Codex ${tr('额度调度器','Quota Scheduler')}</div><div class="brand-subtitle">${tr('智能调度 · 榨干每一份额度','Smart routing · Maximum quota utility')}</div></div></div>
+ <div class="brand"><div class="brand-mark" aria-hidden="true"><svg width="25" height="25" viewBox="0 0 40 25" fill="none"><path d="M19 12.5C11 1 4 4 4 12.5S11 24 19 12.5 34 1 36 12.5s-7 11-17 0" stroke="white" stroke-width="4.2" stroke-linecap="round"/></svg></div><div><div class="brand-title">CPA_Quota_Sentinel</div><div class="brand-subtitle">${tr('Codex 额度保护与调度','Codex quota protection and scheduling')}</div></div></div>
  <nav class="nav" aria-label="${tr('主导航','Main navigation')}">${nav.map(([route,icon,label])=>`<a class="nav-item" href="#${route}" ${state.route===route?'aria-current="page"':''}>${ic(icon,17)}<span>${tr(...label)}</span></a>`).join('')}</nav>
  <div class="sidebar-bottom">
   <label class="sidebar-label" for="language">${tr('界面语言 / Language','Interface language')}</label>
@@ -589,7 +591,7 @@ function renderSettings(){
  return `${renderHeader(tr('调度设置','Scheduling settings'),tr('配置调度策略、刷新周期与故障恢复机制','Configure scheduling strategies, refresh intervals and recovery'))}
  ${rosterWarning()}
     <div class="banner blue settings-note">${ic('info',18)}<div><strong>${tr('默认配置已经过优化','Defaults are already optimized')}</strong><p>${tr('正常情况下无需手动调整；如有修改，请在页面底部保存设置。','Most installations require no manual tuning. Remember to save changes at the bottom.')}</p></div></div>
- <div class="banner blue settings-note">${ic('info',18)}<div><strong>${tr('后台路径','Management path')}: <code>${E(managementPath())}</code></strong><p>${tr('在 CPA 的插件配置中修改路径，保存后使用新地址访问。后台仍需要 CPA 管理密钥。','Change this path in CPA plugin configuration. The admin key remains required.')}</p><a class="btn btn-sm" href="${E(resourceStatusPath())}" target="_blank" rel="noopener noreferrer">${tr('打开后台','Open management')}</a></div></div>
+ <div class="banner blue settings-note">${ic('info',18)}<div><strong>${tr('当前后台路径','Current management path')}</strong><div class="management-entry-row"><code>${E(managementPath())}</code><a class="btn btn-sm" href="${E(resourceStatusPath())}" target="_blank" rel="noopener noreferrer">${tr('打开后台','Open management')}</a></div><p>${tr('未自定义时使用默认路径；可在 CPA 的插件配置中修改。后台仍需要 CPA 管理密钥。','The default path is used unless customized in CPA plugin configuration. The admin key remains required.')}</p></div></div>
  ${state.loaded&&!state.settingsDraft.activate_new_reset?`<div class="banner">${ic('alert',18)}<div><strong>${tr('自动激活新的额度周期：当前已关闭','Automatic activation of new quota windows is off')}</strong><p>${tr('额度重置后只进行只读检查，不会主动发起激活请求；打开可能消耗少量额度。','After quota reset, the scheduler only performs read-only checks; activation can consume quota.')}</p></div></div>`:''}
  <div class="settings-grid">${columns.map(column=>`<div class="settings-col">${column.map(settingsGroup).join('')}</div>`).join('')}</div>
  <div class="settings-savebar"><div class="dirty-label">${state.settingsDirty?`<strong>● ${tr('有未保存的设置修改','Unsaved scheduling changes')}</strong>`:tr('当前设置已保存','Scheduling settings are saved')} · ${tr('与重试链设置独立保存','Saved independently from retry settings')}</div><div class="toolbar-actions">${button('export-settings',ic('download',14)+tr('导出配置','Export settings'))}${button('import-settings',ic('upload',14)+tr('导入配置','Import settings'))}${button('save-settings',ic('check',14)+tr('保存设置','Save settings'),'btn-primary')}</div></div>`;

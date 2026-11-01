@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +21,20 @@ func TestManagementPathConfig(t *testing.T) {
 		if _, err := DecodeConfig([]byte("management_path: '" + path + "'")); err == nil {
 			t.Fatalf("accepted unsafe path %q", path)
 		}
+	}
+}
+
+func TestManagementPathConfigFieldDocumentsDefaultAndJumpEntry(t *testing.T) {
+	fields := managementConfigFields()
+	if len(fields) != 1 {
+		t.Fatalf("management config fields = %#v, want one path field", fields)
+	}
+	field := fields[0]
+	if field.Name != "management_path" || field.Default != managementBasePath {
+		t.Fatalf("management path field = %#v, want default %q", field, managementBasePath)
+	}
+	if !strings.Contains(field.Description, managementBasePath) || !strings.Contains(field.Description, "跳转按钮") {
+		t.Fatalf("management path description does not document its default and jump entry: %q", field.Description)
 	}
 }
 

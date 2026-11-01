@@ -22,7 +22,7 @@ const (
 	FallbackFillFirst FallbackMode = "fill-first"
 )
 
-var pluginVersion = "0.4.2"
+var pluginVersion = "0.4.3"
 
 type MonthlyMode string
 
@@ -643,7 +643,7 @@ func PluginRegistration() registration {
 	return registration{
 		SchemaVersion: pluginabi.SchemaVersion,
 		Metadata: pluginapi.Metadata{
-			Name:             PluginID,
+			Name:             "CPA_Quota_Sentinel",
 			Version:          pluginVersion,
 			Author:           "While-Shark",
 			GitHubRepository: "https://github.com/While-Shark/CPA_Quota_Sentinel",

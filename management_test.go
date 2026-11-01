@@ -700,7 +700,7 @@ func TestStatusHTMLRedactsSensitiveFieldsAndEscapesUserFields(t *testing.T) {
 	if !strings.Contains(html, "codex-quota-scheduler") {
 		t.Fatalf("html missing plugin id: %s", html)
 	}
-	for _, want := range []string{"Codex 额度调度器", "调度设置", "账号队列", "保存设置", "刷新额度", "账号卡片"} {
+	for _, want := range []string{"CPA_Quota_Sentinel", "调度设置", "账号队列", "保存设置", "刷新额度", "账号卡片"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("html missing Chinese UI text %q: %s", want, html)
 		}

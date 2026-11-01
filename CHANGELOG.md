@@ -8,6 +8,11 @@ Earlier releases (v0.1.0 – v0.2.1) predate this file; see the
 [GitHub releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 page for them.
 
+## [v0.4.3] - 2026-11-01
+
+- Display `CPA_Quota_Sentinel` as the plugin name while preserving the CPA plugin ID.
+- Show the resolved default or custom management path beside an Open Management link.
+
 ## [v0.4.2] - 2026-11-01
 
 - Renamed the project presentation to `CPA_Quota_Sentinel` and added a custom
