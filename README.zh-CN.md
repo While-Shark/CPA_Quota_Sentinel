@@ -5,9 +5,16 @@
 `CPA_Quota_Sentinel` 是 CLIProxyAPI（CPA）插件，用于保护 Codex OAuth 账号额度。
 额度偏低时暂停账号，重置后重新核实额度，仅自动恢复由插件暂停的账号。
 
+## 多提供商账号
+
+总览显示全部上游 AUTH 账号。Codex 沿用原额度刷新器，Claude 和 Antigravity 查询各自真实额度接口；其他提供商显示未知额度并保留调度资格。非 Codex 账号在最高可用 CPA 优先级内轮换，共用保护阈值，不自动启用人工禁用账号。本次未使用真实提供商凭据做线上验证。
+
+在 CPA 配置中修改 `management_path` 后，请重启 CPA 重新注册路由，再打开插件侧栏入口。CPA 的 hash 页面地址由宿主管理，不会随插件资源路径变化。在登录卡片输入 CPA 管理密钥加载数据。
+
+
 ## 本仓库新增功能
 
-为兼容 CPA，插件 ID 和动态库名仍为 `codex-quota-scheduler`。
+插件 ID 和动态库名为 `cpa-quota-sentinel`。
 
 - 5 小时与周/月窗口分别配置剩余额度暂停阈值，默认均为 20%。
 - 重置后重新查询额度，达到恢复阈值（默认 30%）才允许恢复。
@@ -76,7 +83,7 @@ CPA 的插件配置弹窗不支持原生动作按钮，“打开后台”链接�
 
 ## 上游版本记录
 
-v0.4.5 更新插件展示名称，并在管理页加入后台路径快捷入口。
+v0.4.6 更新插件展示名称，并在管理页加入后台路径快捷入口。
 完整更新历史见 [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)。
 
 ## 调度逻辑
@@ -263,7 +270,7 @@ CPA 无法确认当前 Codex 账号列表和优先级时，普通刷新和新周
 
 CPA 插件商店通过读取 `registry.json` 索引源，并从对应 GitHub 仓库的 Releases 下载安装包。
 
-1. 在 GitHub 仓库推送 `v*` 版本标签（例如 `v0.4.5`），触发 GitHub Actions 自动编译各平台 `.zip` 包与 `checksums.txt` 并发布到 GitHub Releases。
+1. 在 GitHub 仓库推送 `v*` 版本标签（例如 `v0.4.6`），触发 GitHub Actions 自动编译各平台 `.zip` 包与 `checksums.txt` 并发布到 GitHub Releases。
 2. 在 CPA 的 `config.yaml` 中将本仓库的 `registry.json` 加入 `plugins.store-sources`：
 
 ```yaml
@@ -280,20 +287,20 @@ plugins:
 从 [最新 GitHub Release](https://github.com/While-Shark/CPA_Quota_Sentinel/releases/latest) 下载对应平台的压缩包（或直接使用本地编译生成的 `dist/cpa-quota-sentinel.dll` / `.so` / `.dylib`）：
 
 ```text
-codex-quota-scheduler_<version>_<goos>_<goarch>.zip
+cpa-quota-sentinel_<version>_<goos>_<goarch>.zip
 ```
 
 从压缩包根目录解压动态库，并放入 CPA 对应平台的插件目录：
 
-- macOS：`codex-quota-scheduler.dylib`
-- Linux 和 FreeBSD：`codex-quota-scheduler.so`
-- Windows：`codex-quota-scheduler.dll`
+- macOS：`cpa-quota-sentinel.dylib`
+- Linux 和 FreeBSD：`cpa-quota-sentinel.so`
+- Windows：`cpa-quota-sentinel.dll`
 
 示例：
 
 ```bash
 mkdir -p /path/to/CLIProxyAPI/plugins/darwin/arm64
-cp codex-quota-scheduler.dylib /path/to/CLIProxyAPI/plugins/darwin/arm64/
+cp cpa-quota-sentinel.dylib /path/to/CLIProxyAPI/plugins/darwin/arm64/
 ```
 
 ## CPA 配置
@@ -475,8 +482,8 @@ make build
 构建发布压缩包和校验文件：
 
 ```bash
-make package VERSION=0.4.5
-make checksums VERSION=0.4.5
+make package VERSION=0.4.6
+make checksums VERSION=0.4.6
 ```
 
 Windows 用户可以用以下命令构建 `dist/cpa-quota-sentinel.dll`：
@@ -494,14 +501,14 @@ Windows 用户可以用以下命令构建 `dist/cpa-quota-sentinel.dll`：
 `config.go`、`Makefile` 和两份 README 中的版本字符串。
 
 ```bash
-git tag -a v0.4.5 -m "v0.4.5"
-git push origin v0.4.5
+git tag -a v0.4.6 -m "v0.4.6"
+git push origin v0.4.6
 ```
 
 发布包使用以下命名方式：
 
 ```text
-codex-quota-scheduler_<version>_<goos>_<goarch>.zip
+cpa-quota-sentinel_<version>_<goos>_<goarch>.zip
 ```
 
 ## Management API

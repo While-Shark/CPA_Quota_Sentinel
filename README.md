@@ -8,10 +8,16 @@ after resets, and resumes only accounts the plugin paused.
 
 Upgrade from 0.4.3: stop CPA, remove the old plugin binary, copy its CPA configuration from `codex-quota-scheduler` to `cpa-quota-sentinel`, install the new version, then restart. Do not load both versions. Existing state remains in its original directory. The management URL changes. CPA may show an empty path field; an empty value uses the default path.
 
+## Multi-provider accounts
+
+The overview lists all upstream AUTH accounts. Codex uses its existing quota refresher; Claude and Antigravity use provider quota APIs. Other providers are shown with unknown quotas and remain eligible. Non-Codex accounts rotate within the highest available CPA priority. Protection uses the shared thresholds and never enables manually disabled accounts. Live provider credentials have not been tested in this release.
+
+After changing `management_path` in CPA configuration, restart CPA to reload registered routes, then reopen the plugin sidebar entry. The CPA hash URL is a host page and does not change with the plugin resource path. Enter the CPA management key in the login card.
+
+
 ## Quota Sentinel extension
 
-The CPA plugin ID and library filename remain `codex-quota-scheduler` for
-compatibility.
+The CPA plugin ID and library filename are `cpa-quota-sentinel`.
 
 - Separate remaining-quota pause thresholds for 5-hour and weekly/monthly windows (20% each).
 - Fresh quota verification after reset before recovery (30% remaining by default).
@@ -29,7 +35,7 @@ The current code has local tests and a Windows DLL build verified; live CPA depl
 
 1. Build this repository with Go 1.26 and a C compiler (see Development below). The upstream store package does not include this extension.
 2. Stop CPA before replacing a loaded library. Copy the matching library to the CPA plugin directory for your OS and architecture.
-3. Enable `plugins.enabled` and `plugins.configs.codex-quota-scheduler.enabled` in CPA, then restart it.
+3. Enable `plugins.enabled` and `plugins.configs.cpa-quota-sentinel.enabled` in CPA, then restart it.
 4. Open `/v0/resource/plugins/cpa-quota-sentinel/status`, enter the CPA management key, enable protection in scheduling settings and save.
 5. Refresh account quotas from the page and check account status and logs.
 
@@ -80,7 +86,7 @@ Upstream release downloads contain upstream code, not this repository's changes.
 
 ## Upstream release history
 
-v0.4.5 displays the CPA_Quota_Sentinel name and adds a management path shortcut.
+v0.4.6 displays the CPA_Quota_Sentinel name and adds a management path shortcut.
 Full release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## How Scheduling Works
@@ -306,7 +312,7 @@ Keep this setting disabled unless you understand and accept that risk.
 
 CPA's Plugin Store reads plugin catalogs from `registry.json` sources and downloads release archives from GitHub Releases.
 
-1. Publish a GitHub Release tag (for example `v0.4.5`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
+1. Publish a GitHub Release tag (for example `v0.4.6`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
 2. Add this repository's `registry.json` to `plugins.store-sources` in CPA's `config.yaml`:
 
 ```yaml
@@ -324,21 +330,21 @@ Download the archive for your platform from the
 [latest GitHub release](https://github.com/While-Shark/CPA_Quota_Sentinel/releases/latest) (or use the locally compiled `dist/cpa-quota-sentinel.dll` / `.so` / `.dylib`):
 
 ```text
-codex-quota-scheduler_<version>_<goos>_<goarch>.zip
+cpa-quota-sentinel_<version>_<goos>_<goarch>.zip
 ```
 
 Extract the library from the archive root and place it in CPA's matching plugin
 directory:
 
-- macOS: `codex-quota-scheduler.dylib`
-- Linux and FreeBSD: `codex-quota-scheduler.so`
-- Windows: `codex-quota-scheduler.dll`
+- macOS: `cpa-quota-sentinel.dylib`
+- Linux and FreeBSD: `cpa-quota-sentinel.so`
+- Windows: `cpa-quota-sentinel.dll`
 
 Example:
 
 ```bash
 mkdir -p /path/to/CLIProxyAPI/plugins/darwin/arm64
-cp codex-quota-scheduler.dylib /path/to/CLIProxyAPI/plugins/darwin/arm64/
+cp cpa-quota-sentinel.dylib /path/to/CLIProxyAPI/plugins/darwin/arm64/
 ```
 
 ## CPA Configuration
@@ -536,8 +542,8 @@ make build
 Build release archives and checksums:
 
 ```bash
-make package VERSION=0.4.5
-make checksums VERSION=0.4.5
+make package VERSION=0.4.6
+make checksums VERSION=0.4.6
 ```
 
 Windows users can build `dist/cpa-quota-sentinel.dll` with:
@@ -556,14 +562,14 @@ Before tagging, record the release in `CHANGELOG.md` and bump the version
 strings in `config.go`, `Makefile`, and both READMEs.
 
 ```bash
-git tag -a v0.4.5 -m "v0.4.5"
-git push origin v0.4.5
+git tag -a v0.4.6 -m "v0.4.6"
+git push origin v0.4.6
 ```
 
 Release archives use this naming scheme:
 
 ```text
-codex-quota-scheduler_<version>_<goos>_<goarch>.zip
+cpa-quota-sentinel_<version>_<goos>_<goarch>.zip
 ```
 
 ## Management API

@@ -116,6 +116,7 @@ func windowRemainingFraction(window *QuotaWindow) float64 {
 // The host calls it around reconfiguration; a subsequent register/reconfigure
 // restarts the refresher through startGlobalRefresher.
 func handlePluginQuiesce() ([]byte, error) {
+	stopProviderBackgroundRunner()
 	refresherMu.Lock()
 	refresher := globalRefresher
 	refresherMu.Unlock()

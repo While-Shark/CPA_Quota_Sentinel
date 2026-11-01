@@ -43,7 +43,7 @@ a{color:inherit;text-decoration:none}
 svg{display:block;flex:none}
 code,.mono,.number{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;font-variant-numeric:tabular-nums}
 .app-shell{display:grid;grid-template-columns:var(--sidebar-w) minmax(0,1fr);min-height:100vh}
-.sidebar{position:sticky;top:0;display:flex;flex-direction:column;height:100vh;padding:23px 14px 17px;background:linear-gradient(168deg,#142239 5%,#101c2e 80%);color:#f3f7ff;z-index:5}
+.sidebar{position:sticky;top:0;align-self:start;display:flex;flex-direction:column;height:100vh;padding:23px 14px 17px;background:linear-gradient(168deg,#142239 5%,#101c2e 80%);color:#f3f7ff;z-index:5}
 .brand{display:flex;gap:11px;align-items:center;padding:4px 10px 24px;border-bottom:1px solid rgba(255,255,255,.07)}
 .brand-mark{display:grid;place-items:center;width:39px;height:39px;border-radius:12px;background:#285fef;box-shadow:0 5px 18px #1a57ed40}
 .brand-title{font-size:15px;font-weight:750;line-height:1.35;letter-spacing:-.15px;white-space:nowrap}
@@ -371,7 +371,7 @@ function watchParentLocale(){try{const observer=new MutationObserver(()=>{const 
 /* ---- state ---- */
 const state={
  lang:'zh-CN',loaded:false,route:'overview',
- accounts:[],logs:[],nextId:'',lastSelected:'',monthlyMode:'expiry_order',
+ accounts:[],providerAccounts:[],providerError:'',logs:[],nextId:'',lastSelected:'',monthlyMode:'expiry_order',
  rosterTitle:'',rosterBody:'',
  settingsSaved:null,settingsDraft:null,settingsDirty:false,
  retrySaved:null,retryDraft:null,retryDirty:false,
@@ -392,7 +392,7 @@ function isDuration(s){return /^(?:\d+(?:\.\d+)?(?:ns|us|µs|ms|s|m|h))+$/u.test
 /* ---- toast ---- */
 function toast(message,type='success',sub=''){const area=document.getElementById('toastArea');if(!area)return;const el=document.createElement('div');el.className=`toast ${type==='error'?'error':''}`;el.setAttribute('role',type==='error'?'alert':'status');el.innerHTML=`${ic(type==='error'?'alert':'check',16)}<div><strong>${E(message)}</strong>${sub?`<small>${E(sub)}</small>`:''}</div><button type="button" aria-label="${E(tr('关闭','Close'))}">${ic('close',13)}</button>`;el.querySelector('button').addEventListener('click',()=>el.remove());area.appendChild(el);setTimeout(()=>el.remove(),type==='error'?8000:4500);}
 /* ---- v4 API layer ---- */
-function keyInputValue(){const input=document.getElementById('keyInput');return input?String(input.value||'').trim():''}
+function keyInputValue(){return String(state.key||'').trim()}
 function hasManagementKey(){return !!keyInputValue()}
 function authHeaders(){const key=keyInputValue();if(!key){state.keyError=true;throw new Error(tr('需要填写 CPA 管理密钥','CPA admin key is required'))}state.keyError=false;const name='Author'+'ization';const scheme='Bea'+'rer ';const headers={};headers[name]=key.toLowerCase().startsWith(scheme.toLowerCase())?key:scheme+key;return headers}
 async function readJSON(resp){const text=await resp.text();if(!text)return{};try{return JSON.parse(text)}catch(error){return{error:text}}}
@@ -505,6 +505,10 @@ function accountCard(a){
  <div class="card-actions">${button('pin',ic('pin',13)+pinLabel,pinned?'btn-subtle':'',`data-id="${E(a.auth_id)}"`)}${button('refresh-account',ic('refresh',13)+tr('刷新额度','Refresh'),'',`data-id="${E(a.auth_id)}"`)}${button('edit',ic('edit',13)+tr('编辑','Edit'),'',`data-id="${E(a.auth_id)}"`)}</div>
 </article>`;
 }
+function renderProviderAccounts(){
+ const accounts=state.providerAccounts;
+ return `<section class="panel" style="padding:20px;margin-top:20px"><div class="section-heading"><h2>${tr('上游 AUTH 账号','Upstream AUTH accounts')} (${accounts.length})</h2>${button('refresh-provider-accounts',tr('查询全部额度','Query all quotas'),'btn-sm')}</div><p>${tr('按提供商读取真实额度窗口；未提供额度数据的账号不会被当作耗尽。','Read actual provider quota windows. Accounts without quota data are never treated as exhausted.')}</p>${state.providerError?`<p role="alert">${E(state.providerError)}</p>`:''}<div class="accounts-grid">${accounts.map(a=>`<article class="panel" style="padding:16px"><strong>${E(a.auth_id)}</strong> ${pill(E(a.provider),'blue')}<p>${E(a.quota_status||'unknown')}${a.disabled?' · '+tr('已禁用','Disabled'):''}${a.paused?' · '+tr('保护暂停','Protection paused'):''}</p>${(a.windows||[]).map(w=>quotaMarkup({remaining_percent:w.remaining_percent,used_percent:w.remaining_percent==null?null:100-w.remaining_percent,reset_at:w.reset_at},E(w.name))).join('')||`<p>${tr('上游未提供额度','Upstream quota not provided')}</p>`}${a.error?`<p role="alert">${E(a.error)}</p>`:''}</article>`).join('')}</div></section>`;
+}
 function renderOverview(){
  const available=state.accounts.filter(a=>a.available&&!a.quota_protection_paused).length;
  const empty=state.accounts.length===0?STATUS.empty_state||{}:{};
@@ -516,7 +520,7 @@ function renderOverview(){
   <div class="panel metric"><div class="metric-icon">${ic('clock',21)}</div><div><div class="metric-label">${tr('最近选择','Last selected')}</div><div class="metric-value mono">${E(state.lastSelected||tr('暂无','None'))}</div><div class="metric-hint">${tr('上一次实际选中的账号','Most recently used account')}</div></div></div>
  </section>
  <div class="section-heading"><h2>${tr('调度队列','Scheduling queue')} <span>(${state.accounts.length})</span></h2><span>${tr('当前可用','Available')} ${available} / ${state.accounts.length} · ${tr('按调度顺序显示','Ordered by scheduler priority')}</span></div>
- ${state.accounts.length?`<section class="accounts-grid">${state.accounts.map(accountCard).join('')}</section>`:`<div class="panel empty"><div class="empty-icon">${ic('users',24)}</div><h3>${E(empty.title||tr('暂无账号数据','No account data yet'))}</h3><p>${E(empty.message||tr('等待额度刷新后，这里会显示账号卡片。','Cards will appear after the next quota refresh.'))}</p></div>`}`;
+ ${state.accounts.length?`<section class="accounts-grid">${state.accounts.map(accountCard).join('')}</section>`:`<div class="panel empty"><div class="empty-icon">${ic('users',24)}</div><h3>${E(empty.title||tr('暂无账号数据','No account data yet'))}</h3><p>${E(empty.message||tr('等待额度刷新后，这里会显示账号卡片。','Cards will appear after the next quota refresh.'))}</p></div>`}${renderProviderAccounts()}`;
 }
 /* ---- render: logs ---- */
 function logFieldsText(log){if(!log.fields)return '';if(typeof log.fields==='string')return log.fields;return Object.entries(log.fields).map(([key,value])=>`${key}=${value}`).join(', ');}
@@ -587,7 +591,7 @@ function settingsControl(item){
 function settingRow(item){const [key,type,name,help]=item;return `<div class="setting-row ${type==='radio'?'radio-setting':''}"><div class="setting-description"><label class="setting-name">${E(tr(...name))}</label><div class="setting-help">${E(tr(...help))}</div></div><div class="setting-control">${settingsControl(item)}</div></div>`;}
 function settingsGroup(group){return `<section class="panel settings-panel"><div class="group-header"><div class="group-icon ${group.warn?'warn':''}">${ic(group.icon,18)}</div><div><h2 class="group-title">${E(tr(...group.title))}</h2><p class="group-desc">${E(tr(...group.description))}</p></div></div>${group.items.map(settingRow).join('')}${group.id==='quota_protection'?`<div class="setting-row"><span class="setting-help">${tr('常规额度刷新仍按「额度刷新间隔」单独运行。','Regular quota refresh continues on its separate Refresh interval.')}</span>${button('copy-protection-policy',tr('复制当前策略 JSON','Copy policy JSON'),'btn-sm')}</div>`:''}${group.id==='failure'?`<div class="settings-footnote">${ic('alert',13)} ${tr('⚠ 后两项属于高风险操作（使用过期账号列表探测、写宿主认证文件）；默认关闭，除非明确需要。','⚠ The last two options are high risk (probing with a stale roster, writing host auth files); leave off unless required.')}</div>`:''}</section>`;}
 function renderSettings(){
- const columns=[[SETTING_GROUPS[0],SETTING_GROUPS[1],SETTING_GROUPS[3],SETTING_GROUPS[5]],[SETTING_GROUPS[2],SETTING_GROUPS[4]]];
+ const columns=[[SETTING_GROUPS[2],SETTING_GROUPS[0],SETTING_GROUPS[1]],[SETTING_GROUPS[3],SETTING_GROUPS[4],SETTING_GROUPS[5]]];
  return `${renderHeader(tr('调度设置','Scheduling settings'),tr('配置调度策略、刷新周期与故障恢复机制','Configure scheduling strategies, refresh intervals and recovery'))}
  ${rosterWarning()}
     <div class="banner blue settings-note">${ic('info',18)}<div><strong>${tr('默认配置已经过优化','Defaults are already optimized')}</strong><p>${tr('正常情况下无需手动调整；如有修改，请在页面底部保存设置。','Most installations require no manual tuning. Remember to save changes at the bottom.')}</p></div></div>
@@ -651,7 +655,7 @@ function renderRetry(){
 }
 /* ---- render: root ---- */
 function getRoute(){const route=location.hash.replace('#','');return ['overview','logs','settings','retry'].includes(route)?route:'overview';}
-function renderNotLoaded(){return `<div class="not-loaded"><div class="panel empty" style="width:min(520px,100%);padding:35px"><div class="empty-icon">${ic('lock',24)}</div><h3>${tr('连接至 CPA 管理中心','Connect to CPA management')}</h3><p>${tr('在左侧输入管理密钥并点击「加载数据」。密钥只用于访问 CPA 管理接口，不会发送到其他地方。','Enter your admin key in the sidebar and click Load data. The key is only used for the CPA management API.')}</p><div style="margin-top:17px">${button('load',tr('加载数据','Load data'),'btn-primary')}</div></div></div>`;}
+function renderNotLoaded(){return `<div class="not-loaded"><div class="panel empty" style="width:min(520px,100%);padding:35px"><div class="empty-icon">${ic('lock',24)}</div><h3>${tr('连接至 CPA 管理中心','Connect to CPA management')}</h3><p>${tr('输入 CPA 管理密钥以加载账号额度和轮换设置。密钥仅发送到当前 CPA 管理接口。','Enter your CPA admin key to load account quotas and rotation settings. The key is only sent to this CPA management API.')}</p><label for="loginKeyInput">${tr('CPA 管理密钥','CPA admin key')}</label><input id="loginKeyInput" type="password" value="${E(state.key)}" placeholder="${tr('输入 CPA 管理密钥','Enter CPA admin key')}" autocomplete="off" style="display:block;width:100%;margin:10px 0;padding:10px" aria-invalid="${state.keyError}"><p class="mono" style="overflow-wrap:anywhere">${E(managementBase())}</p><div style="margin-top:17px">${button('load',tr('加载数据','Load data'),'btn-primary')}</div></div></div>`;}
 function render(){
  state.route=getRoute();document.documentElement.lang=state.lang==='en'?'en':'zh-CN';
  const content=state.loaded?({overview:renderOverview,logs:renderLogs,settings:renderSettings,retry:renderRetry}[state.route]||renderOverview)():renderNotLoaded();
@@ -665,7 +669,8 @@ function renderKeepScroll(){
 /* ---- live data flow ---- */
 let statusPollID=null;
 async function refreshSnapshot(){const data=await requestManagement('/status',{query:{format:'json'}});normalizeStatus(data);const apiSettings=data.settings||{};state.settingsSaved=settingsFromAPI(apiSettings);state.retrySaved=retryFromAPI(apiSettings);if(!state.settingsDirty)state.settingsDraft=clone(state.settingsSaved);if(!state.retryDirty)state.retryDraft=clone(state.retrySaved);}
-async function loadStatus(){await refreshSnapshot();state.loaded=true;state.keyError=false;startStatusPolling();}
+async function refreshProviderAccounts(probe=false){try{const data=await requestManagement('/provider-accounts',probe?{method:'POST',body:{}}:{});state.providerAccounts=Array.isArray(data.accounts)?data.accounts:[];state.providerError=''}catch(error){state.providerError=error.message||String(error)}}
+async function loadStatus(){await refreshSnapshot();await refreshProviderAccounts();state.loaded=true;state.keyError=false;startStatusPolling();}
 async function refreshRetryRuntime(){try{normalizeRetryRuntime(await requestManagement('/retry/status',{query:{format:'json'}}))}catch(error){}}
 function startStatusPolling(){if(statusPollID)return;statusPollID=window.setInterval(async()=>{try{await refreshSnapshot();await refreshRetryRuntime();const focus=document.activeElement;if(focus&&(focus.tagName==='INPUT'||focus.tagName==='SELECT'||focus.tagName==='TEXTAREA')&&document.getElementById('main')&&document.getElementById('main').contains(focus))return;renderKeepScroll()}catch(error){}},15000)}
 async function pollStatus(times,delayMs){for(let i=0;i<times;i++){await new Promise((resolve)=>window.setTimeout(resolve,delayMs));await refreshSnapshot();renderKeepScroll()}}
@@ -699,6 +704,7 @@ document.addEventListener('click',async(ev)=>{
  const action=nodeTarget.dataset.action;const id=nodeTarget.dataset.id;const ci=Number(nodeTarget.dataset.ci);const ti=Number(nodeTarget.dataset.ti);
  const chain=Number.isInteger(ci)?state.retryDraft.chains[ci]:null;
  try{
+  if(action==='refresh-provider-accounts'){await refreshProviderAccounts(true);renderKeepScroll();return}
   if(action==='load'){
     if(!state.loaded){await loadStatus();await refreshRetryRuntime();renderKeepScroll();toast(tr('已加载当前状态','Current state loaded'),'',0)}
     else{await requestManagement('/refresh',{method:'POST',body:{}});toast(tr('已请求后台刷新额度','Background quota refresh requested'));await refreshSnapshot();renderKeepScroll();pollStatus(3,1200)}
@@ -731,7 +737,7 @@ document.addEventListener('click',async(ev)=>{
 });
 document.addEventListener('input',(ev)=>{
  const el=ev.target;const d=el.dataset;
- if(el.id==='keyInput'){state.key=el.value;if(state.remember)persistRememberKey();return}
+ if(el.id==='keyInput'||el.id==='loginKeyInput'){state.key=el.value;const other=document.getElementById(el.id==='keyInput'?'loginKeyInput':'keyInput');if(other)other.value=el.value;if(state.remember)persistRememberKey();return}
  if(d.setting&&el.type!=='checkbox'&&el.type!=='radio'){state.settingsDraft[d.setting]=el.type==='number'?Number(el.value):el.value;state.settingsDirty=true;syncSavebarDirty();return}
  if(d.chainSource!==undefined){const c=state.retryDraft.chains[+d.chainSource];if(c)c.source=el.value;state.retryDirty=true;syncSavebarDirty();return}
  if(d.targetField){const target=state.retryDraft.chains[+d.chainIndex]&&state.retryDraft.chains[+d.chainIndex].targets[+d.targetIndex];if(target)target[d.targetField]=el.value;state.retryDirty=true;return}

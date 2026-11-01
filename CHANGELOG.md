@@ -8,6 +8,12 @@ Earlier releases (v0.1.0 – v0.2.1) predate this file; see the
 [GitHub releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 page for them.
 
+## [v0.4.6] - 2026-11-02
+
+- Add upstream AUTH inventory, real Claude and Antigravity quota probes, and rotation within the highest available CPA priority. Other providers remain visible with unknown quotas.
+- Add an inline management-key login field, fix sidebar positioning, and normalize custom paths. CPA must reload the plugin after changing its registered path.
+- Preserve pause state across restarts and verify reset, recovery threshold and previously observed windows before automatic recovery.
+
 ## [v0.4.5] - 2026-11-01
 
 - Unify the sidebar name as `CPA_Quota_Sentinel`.

@@ -12,9 +12,16 @@ var managementPathPattern = regexp.MustCompile(`^/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-
 
 // validateManagementPath 限制入口为站内静态路径，避免路径规范化或路由通配符绕过。
 func validateManagementPath(path string) (string, error) {
+	path = strings.TrimSpace(path)
 	if path == "" {
 		return managementBasePath, nil
 	}
+	// CPA 配置面板的字符串输入不会规范化用户输入，容忍常见首尾斜杠操作，
+	// 但仍在校验前拒绝 URL、编码字符和重复分隔符。
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	path = strings.TrimRight(path, "/")
 	if len(path) > 160 || !managementPathPattern.MatchString(path) || strings.HasPrefix(path, "/v0/") {
 		return "", fmt.Errorf("management_path 必须是以 / 开头、由字母数字及 -_ 组成的静态路径，最长 160 字符，不含 /v0 前缀")
 	}
@@ -24,7 +31,7 @@ func validateManagementPath(path string) (string, error) {
 // managementConfigFields 声明 CPA 原生配置弹窗支持的后台入口字段。
 func managementConfigFields() []pluginapi.ConfigField {
 	return []pluginapi.ConfigField{{Name: "management_path", Type: pluginapi.ConfigFieldTypeString, Default: managementBasePath,
-		Description: "自定义后台路径，例如 /sentinel-secret。留空时使用默认路径 " + managementBasePath + "。保存插件配置后生效；原路径立即失效。后台仍需 CPA 管理密钥。管理页内提供路径跳转按钮。"}}
+		Description: "自定义后台路径，例如 /sentinel-secret。留空时使用默认路径 " + managementBasePath + "。保存后重启 CPA 重新加载路由，再打开侧栏入口；原路径将失效。后台仍需 CPA 管理密钥。管理页内提供路径跳转按钮。"}}
 }
 
 // configuredManagementPath 返回经过校验的管理路由基址。

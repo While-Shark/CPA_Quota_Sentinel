@@ -8,6 +8,12 @@ v0.1.0 – v0.2.1 等更早版本早于本文件建立，请查看
 [GitHub Releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 页面。
 
+## [v0.4.6] - 2026-11-02
+
+- 增加上游 AUTH 账号清单、Claude 与 Antigravity 真实额度探测及最高可用 CPA 优先级内轮换；其他提供商保留未知额度显示。
+- 登录卡片增加管理密钥输入，修复侧栏定位并规范化自定义路径；修改注册路径后需重新加载插件。
+- 持久化暂停状态，自动恢复前校验重置时间、恢复阈值和此前观察到的窗口。
+
 ## [v0.4.5] - 2026-11-01
 
 - 将侧边栏名称统一为 `CPA_Quota_Sentinel`。

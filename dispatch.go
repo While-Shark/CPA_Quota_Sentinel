@@ -103,8 +103,13 @@ func configure(raw []byte) error {
 	}
 	disk, loadedDisk, err := loadUserDataWithMigration(semanticStatePaths(defaultStatePath()), OSFileHooks(), nil)
 	if err == nil && loadedDisk {
-		// 后台入口由 CPA 配置拥有，磁盘中的普通页面设置不能覆盖宿主更新。
+		// 后台入口优先遵循 CPA 宿主显式自定义；若宿主保持默认而磁盘有自定义，保留用户设置。
 		managementPath := cfg.ManagementPath
+		if managementPath == "" || managementPath == managementBasePath {
+			if disk.Config.ManagementPath != "" && disk.Config.ManagementPath != managementBasePath {
+				managementPath = disk.Config.ManagementPath
+			}
+		}
 		cfg = disk.Config
 		cfg.ManagementPath = managementPath
 	} else {
@@ -144,6 +149,15 @@ func handleSchedulerPick(raw []byte) ([]byte, error) {
 		if err := json.Unmarshal(raw, &req); err != nil {
 			return nil, err
 		}
+	}
+	if !requestIncludesCodex(req) {
+		decision := pickProviderAccount(req, time.Now())
+		return okEnvelope(pluginapi.SchedulerPickResponse{
+			AuthID:       decision.AuthID,
+			Handled:      decision.Handled,
+			Reject:       decision.Reject,
+			RejectReason: decision.Reason,
+		})
 	}
 	decision := schedulerPickPublished(req, time.Now())
 	return okEnvelope(pluginapi.SchedulerPickResponse{
@@ -369,6 +383,7 @@ func startGlobalRefresher() {
 	if globalState.Config().RefreshOnStartup {
 		refresher.RefreshSoon()
 	}
+	startProviderBackgroundRunner()
 }
 
 func refreshGlobalRefresherSoon() {
@@ -379,6 +394,7 @@ func refreshGlobalRefresherSoon() {
 		globalState.RecordLog("info", "quota.refresh_requested", "已请求后台刷新额度", nil, time.Now())
 		refresher.RefreshSoon()
 	}
+	startProviderBackgroundRunner()
 }
 
 func refreshGlobalRefresherOneSoon(authID string) {

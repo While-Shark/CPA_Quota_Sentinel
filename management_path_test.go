@@ -11,13 +11,19 @@ import (
 
 // TestManagementPathConfig 验证自定义路径不能引入 URL、路由通配符或编码绕过。
 func TestManagementPathConfig(t *testing.T) {
-	for _, path := range []string{"/sentinel_ABC-123", "/private/sentinel"} {
-		cfg, err := DecodeConfig([]byte("management_path: " + path))
-		if err != nil || cfg.ManagementPath != path {
-			t.Fatalf("path %q: cfg=%#v err=%v", path, cfg, err)
+	for _, tc := range []struct{ input, want string }{
+		{"/sentinel_ABC-123", "/sentinel_ABC-123"},
+		{"/private/sentinel", "/private/sentinel"},
+		{"sentinel-secret", "/sentinel-secret"},
+		{"/sentinel-secret/", "/sentinel-secret"},
+		{"  sentinel-secret/  ", "/sentinel-secret"},
+	} {
+		cfg, err := DecodeConfig([]byte("management_path: '" + tc.input + "'"))
+		if err != nil || cfg.ManagementPath != tc.want {
+			t.Fatalf("path %q: cfg=%#v err=%v; want %q", tc.input, cfg, err, tc.want)
 		}
 	}
-	for _, path := range []string{"https://example.com", "/../admin", "/v0/management", "/secret/", "/secret%2fstatus", "/secret?x=1", "/secret/*all", "/secret//nested"} {
+	for _, path := range []string{"https://example.com", "/../admin", "/v0/management", "/secret%2fstatus", "/secret?x=1", "/secret/*all", "/secret//nested", "///"} {
 		if _, err := DecodeConfig([]byte("management_path: '" + path + "'")); err == nil {
 			t.Fatalf("accepted unsafe path %q", path)
 		}
@@ -68,5 +74,23 @@ func TestCustomManagementRoutes(t *testing.T) {
 		if response.StatusCode != http.StatusOK {
 			t.Errorf("%s: status = %d", path, response.StatusCode)
 		}
+	}
+}
+func TestConfigFromSettingsManagementPath(t *testing.T) {
+	base := DefaultConfig()
+	payload := SettingsFromConfig(base)
+	payload.ManagementPath = "  my-secret-path/ "
+	updated, err := ConfigFromSettings(base, payload)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if updated.ManagementPath != "/my-secret-path" {
+		t.Fatalf("ManagementPath = %q, want %q", updated.ManagementPath, "/my-secret-path")
+	}
+
+	invalidPayload := SettingsFromConfig(base)
+	invalidPayload.ManagementPath = "https://bad-url"
+	if _, err := ConfigFromSettings(base, invalidPayload); err == nil {
+		t.Fatal("expected error on invalid management path")
 	}
 }

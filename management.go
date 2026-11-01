@@ -40,6 +40,7 @@ type StatusPayload struct {
 	EmptyState            EmptyStatePayload      `json:"empty_state,omitempty"`
 	Settings              SettingsPayload        `json:"settings"`
 	Accounts              []StatusAccount        `json:"accounts"`
+	ProviderAccounts      []ProviderAccount      `json:"provider_accounts,omitempty"`
 	Groups                []StatusGroup          `json:"groups,omitempty"`
 	Logs                  []LogEntry             `json:"logs"`
 }
@@ -242,6 +243,8 @@ func registerManagementWithConfig(cfg Config) pluginapi.ManagementRegistrationRe
 			{Method: http.MethodPut, Path: managementBasePath + "/settings", Description: "Update scheduler settings."},
 			{Method: http.MethodPost, Path: managementBasePath + "/refresh", Description: "Refresh quota status soon."},
 			{Method: http.MethodPost, Path: managementBasePath + "/refresh/account", Description: "Refresh one account quota soon."},
+			{Method: http.MethodGet, Path: managementBasePath + "/provider-accounts", Description: "List auth accounts across providers."},
+			{Method: http.MethodPost, Path: managementBasePath + "/provider-accounts", Description: "Refresh quotas for supported providers."},
 			{Method: http.MethodGet, Path: managementBasePath + "/logs", Description: "Read scheduler logs."},
 			{Method: http.MethodGet, Path: managementBasePath + "/export", Description: "Export scheduler configuration."},
 			{Method: http.MethodPost, Path: managementBasePath + "/import", Description: "Import scheduler configuration."},
@@ -289,6 +292,18 @@ func handleManagementRequest(store *PluginState, req pluginapi.ManagementRequest
 		return jsonManagementResponse(http.StatusAccepted, map[string]bool{"ok": true})
 	case method == http.MethodPost && path == "/refresh/account":
 		return handleRefreshAccountRequest(store, req, now)
+	case method == http.MethodGet && path == "/provider-accounts":
+		accounts, err := RefreshProviderAccounts(context.Background(), false)
+		if err != nil {
+			return jsonManagementResponse(http.StatusBadGateway, map[string]any{"error": err.Error(), "accounts": accounts})
+		}
+		return jsonManagementResponse(http.StatusOK, map[string]any{"accounts": accounts})
+	case method == http.MethodPost && path == "/provider-accounts":
+		accounts, err := RefreshProviderAccounts(context.Background(), true)
+		if err != nil {
+			return jsonManagementResponse(http.StatusBadGateway, map[string]any{"error": err.Error(), "accounts": accounts})
+		}
+		return jsonManagementResponse(http.StatusOK, map[string]any{"accounts": accounts})
 	case method == http.MethodGet && path == "/logs":
 		return jsonManagementResponse(http.StatusOK, map[string]any{"logs": store.Snapshot(now).Logs})
 	case method == http.MethodGet && path == "/retry/status":
@@ -442,6 +457,13 @@ func formatByteSize(size int64) string {
 
 func ConfigFromSettings(base Config, payload SettingsPayload) (Config, error) {
 	cfg := NormalizeConfig(base)
+	if payload.ManagementPath != "" {
+		path, err := validateManagementPath(payload.ManagementPath)
+		if err != nil {
+			return Config{}, jsonError(err.Error())
+		}
+		cfg.ManagementPath = path
+	}
 	if payload.MonthlyMode != "" {
 		cfg.MonthlyMode = payload.MonthlyMode
 	}
@@ -730,6 +752,7 @@ func buildStatusPayload(snapshot StateSnapshot, ordered []ScheduledAccount, life
 		CodexAuthCount:        snapshot.CodexAuthCount,
 		Settings:              SettingsFromConfig(snapshot.Config),
 		Accounts:              make([]StatusAccount, 0, len(ordered)),
+		ProviderAccounts:      globalMultiProviderRegistry.GetAll(),
 		Groups:                make([]StatusGroup, 0, len(snapshot.Annotations.Groups)),
 		Logs:                  cloneLogs(snapshot.Logs),
 	}
