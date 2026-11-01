@@ -27,7 +27,7 @@ func TestManagementRegisterExposesStatusResourceAndRoutes(t *testing.T) {
 	if resources["/status"].Menu == "" {
 		t.Fatalf("status resource Menu is empty: %#v", resources["/status"])
 	}
-	if resources["/status"].Menu != "CPA Quota Sentinel" {
+	if resources["/status"].Menu != "CPA_Quota_Sentinel" {
 		t.Fatalf("status resource Menu = %q, want English static label", resources["/status"].Menu)
 	}
 	if _, ok := resources["/status-data"]; ok {

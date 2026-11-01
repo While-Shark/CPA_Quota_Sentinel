@@ -80,7 +80,7 @@ Upstream release downloads contain upstream code, not this repository's changes.
 
 ## Upstream release history
 
-v0.4.4 displays the CPA_Quota_Sentinel name and adds a management path shortcut.
+v0.4.5 displays the CPA_Quota_Sentinel name and adds a management path shortcut.
 Full release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## How Scheduling Works
@@ -306,7 +306,7 @@ Keep this setting disabled unless you understand and accept that risk.
 
 CPA's Plugin Store reads plugin catalogs from `registry.json` sources and downloads release archives from GitHub Releases.
 
-1. Publish a GitHub Release tag (for example `v0.4.4`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
+1. Publish a GitHub Release tag (for example `v0.4.5`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
 2. Add this repository's `registry.json` to `plugins.store-sources` in CPA's `config.yaml`:
 
 ```yaml
@@ -536,8 +536,8 @@ make build
 Build release archives and checksums:
 
 ```bash
-make package VERSION=0.4.4
-make checksums VERSION=0.4.4
+make package VERSION=0.4.5
+make checksums VERSION=0.4.5
 ```
 
 Windows users can build `dist/cpa-quota-sentinel.dll` with:
@@ -556,8 +556,8 @@ Before tagging, record the release in `CHANGELOG.md` and bump the version
 strings in `config.go`, `Makefile`, and both READMEs.
 
 ```bash
-git tag -a v0.4.4 -m "v0.4.4"
-git push origin v0.4.4
+git tag -a v0.4.5 -m "v0.4.5"
+git push origin v0.4.5
 ```
 
 Release archives use this naming scheme:

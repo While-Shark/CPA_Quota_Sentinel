@@ -8,6 +8,10 @@ Earlier releases (v0.1.0 – v0.2.1) predate this file; see the
 [GitHub releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 page for them.
 
+## [v0.4.5] - 2026-11-01
+
+- Unify the sidebar name as `CPA_Quota_Sentinel`.
+
 ## [v0.4.4] - 2026-11-01
 
 - Rename the plugin ID and sidebar entry; retain the existing state directory for upgrades.

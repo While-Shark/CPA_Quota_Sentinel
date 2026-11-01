@@ -1,5 +1,5 @@
 PLUGIN_NAME ?= cpa-quota-sentinel
-VERSION ?= 0.4.4
+VERSION ?= 0.4.5
 BUILD_DIR ?= dist
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)

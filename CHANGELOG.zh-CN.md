@@ -8,6 +8,10 @@ v0.1.0 – v0.2.1 等更早版本早于本文件建立，请查看
 [GitHub Releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 页面。
 
+## [v0.4.5] - 2026-11-01
+
+- 将侧边栏名称统一为 `CPA_Quota_Sentinel`。
+
 ## [v0.4.4] - 2026-11-01
 
 - 更新插件 ID 和侧栏名称，沿用原状态目录以保留升级前记录。
