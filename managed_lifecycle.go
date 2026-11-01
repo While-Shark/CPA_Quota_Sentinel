@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -38,6 +40,7 @@ type LifecycleEvent struct {
 // ManagedDisableRecord is the durable ownership record. Its presence means the
 // plugin, rather than an operator, owns the corresponding disabled flag.
 type ManagedDisableRecord struct {
+	OwnershipToken   string                `json:"ownership_token,omitempty"`
 	DisabledAt       time.Time             `json:"disabled_at"`
 	DisableApplied   bool                  `json:"disable_applied"`
 	Fingerprint      CredentialFingerprint `json:"fingerprint,omitempty"`
@@ -63,6 +66,8 @@ func (r *QuotaRefresher) ApplyManagedQuotaDisable(ctx context.Context, event Quo
 	if r == nil || r.host == nil || r.runtimeStore == nil || !r.state.Config().EnableManagedQuotaDisable || event.AuthIndex == "" {
 		return nil
 	}
+	authLifecycleMu.Lock()
+	defer authLifecycleMu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -82,9 +87,15 @@ func (r *QuotaRefresher) ApplyManagedQuotaDisable(ctx context.Context, event Quo
 		_ = json.Unmarshal(value, &disabled)
 	}
 	credentials, credErr := ExtractCodexCredentials(response.JSON)
+	if credErr != nil {
+		return credErr
+	}
 	persisted, err := r.runtimeStore.PersistentSnapshot()
 	if err != nil {
 		return err
+	}
+	if _, protected := persisted.QuotaProtection[event.AuthIndex]; protected {
+		return nil
 	}
 	record, owned := persisted.ManagedLifecycle[event.AuthIndex]
 	if disabled && !owned {
@@ -100,6 +111,13 @@ func (r *QuotaRefresher) ApplyManagedQuotaDisable(ctx context.Context, event Quo
 		return err
 	}
 	now := r.now()
+	if !disabled && (!owned || record.OwnershipToken == "") {
+		token := make([]byte, 24)
+		if _, err := rand.Read(token); err != nil {
+			return err
+		}
+		record.OwnershipToken = hex.EncodeToString(token)
+	}
 	var fingerprint CredentialFingerprint
 	if credErr == nil {
 		fingerprint = managedAuthFingerprint(event.AuthIndex, credentials)
@@ -107,18 +125,19 @@ func (r *QuotaRefresher) ApplyManagedQuotaDisable(ctx context.Context, event Quo
 		fingerprint = record.Fingerprint
 	}
 	if _, err := r.runtimeStore.Update(func(state *PersistentState) error {
-		record := state.ManagedLifecycle[event.AuthIndex]
-		if record.DisabledAt.IsZero() {
-			record.DisabledAt = now
+		item := state.ManagedLifecycle[event.AuthIndex]
+		if item.DisabledAt.IsZero() {
+			item.DisabledAt = now
 		}
-		record.Last429At = now
-		record.ResetAt = event.ResetAt
-		record.NextQuotaCheckAt = event.ResetAt
+		item.OwnershipToken = record.OwnershipToken
+		item.Last429At = now
+		item.ResetAt = event.ResetAt
+		item.NextQuotaCheckAt = event.ResetAt
 		if fingerprint.ValidHashes() {
-			record.Fingerprint = fingerprint
+			item.Fingerprint = fingerprint
 		}
-		record = appendLifecycleEvent(record, LifecycleEvent{Kind: "quota_429", At: now, Detail: event.Reason}, r.state.Config().LifecycleEventLimit)
-		state.ManagedLifecycle[event.AuthIndex] = record
+		item = appendLifecycleEvent(item, LifecycleEvent{Kind: "quota_429", At: now, Detail: event.Reason}, r.state.Config().LifecycleEventLimit)
+		state.ManagedLifecycle[event.AuthIndex] = item
 		return nil
 	}); err != nil {
 		return err
@@ -127,6 +146,7 @@ func (r *QuotaRefresher) ApplyManagedQuotaDisable(ctx context.Context, event Quo
 		return nil
 	}
 	raw["disabled"] = json.RawMessage("true")
+	raw[quotaProtectionOwnerKey], _ = json.Marshal(record.OwnershipToken)
 	next, err := json.Marshal(raw)
 	if err != nil {
 		return err
@@ -156,6 +176,8 @@ func (r *QuotaRefresher) RecoverManagedQuotaAccounts(ctx context.Context) error 
 	if r == nil || r.host == nil || r.runtimeStore == nil || !r.state.Config().EnableManagedQuotaDisable {
 		return nil
 	}
+	authLifecycleMu.Lock()
+	defer authLifecycleMu.Unlock()
 	if err := r.reconcilePlannedManagedRecords(ctx); err != nil {
 		return err
 	}
@@ -165,6 +187,9 @@ func (r *QuotaRefresher) RecoverManagedQuotaAccounts(ctx context.Context) error 
 	}
 	indices := make([]string, 0, len(persisted.ManagedLifecycle))
 	for index, record := range persisted.ManagedLifecycle {
+		if _, protected := persisted.QuotaProtection[index]; protected {
+			continue
+		}
 		if record.DisableApplied && (record.NextQuotaCheckAt.IsZero() || !record.NextQuotaCheckAt.After(r.now())) {
 			indices = append(indices, index)
 		}
@@ -215,7 +240,11 @@ func (r *QuotaRefresher) reconcilePlannedManagedRecords(ctx context.Context) err
 			if !ok {
 				return nil
 			}
-			if disabled {
+			var marker string
+			_ = json.Unmarshal(raw[quotaProtectionOwnerKey], &marker)
+			credentials, credErr := ExtractCodexCredentials(response.JSON)
+			if disabled && record.OwnershipToken != "" && marker == record.OwnershipToken &&
+				credErr == nil && record.Fingerprint.ValidHashes() && record.Fingerprint == managedAuthFingerprint(index, credentials) {
 				record.DisableApplied = true
 				record = appendLifecycleEvent(record, LifecycleEvent{Kind: "disable_confirmed", At: r.now()}, r.state.Config().LifecycleEventLimit)
 			} else {
@@ -242,7 +271,10 @@ func (r *QuotaRefresher) managedRecoveryDeadline(now time.Time) time.Time {
 		return time.Time{}
 	}
 	var deadline time.Time
-	for _, record := range persisted.ManagedLifecycle {
+	for index, record := range persisted.ManagedLifecycle {
+		if _, protected := persisted.QuotaProtection[index]; protected {
+			continue
+		}
 		if !record.DisableApplied {
 			continue
 		}
@@ -285,6 +317,14 @@ func (r *QuotaRefresher) recoverManagedQuotaAccount(ctx context.Context, authInd
 	if credErr != nil || credentials.ChatGPTAccountID == "" {
 		return r.recordManagedQuotaCheck(authIndex, now)
 	}
+	var marker string
+	_ = json.Unmarshal(raw[quotaProtectionOwnerKey], &marker)
+	if record.OwnershipToken == "" || marker != record.OwnershipToken || !record.Fingerprint.ValidHashes() {
+		// 老版本没有可靠标记，无法证明当前禁用属于插件，留给操作员处理。
+		r.state.RecordLog("warn", "managed.ownership_lost", "缺少托管所有权证据，停止自动恢复", map[string]any{"auth_index": authIndex}, now)
+		_, err := r.runtimeStore.Update(func(state *PersistentState) error { delete(state.ManagedLifecycle, authIndex); return nil })
+		return err
+	}
 	if owned && record.Fingerprint.ValidHashes() && record.Fingerprint != managedAuthFingerprint(authIndex, credentials) {
 		// The credential under this file rotated after our disable. Do not
 		// enable someone else's credential: drop ownership and leave the flag
@@ -308,7 +348,13 @@ func (r *QuotaRefresher) recoverManagedQuotaAccount(ctx context.Context, authInd
 	if err != nil || !managedQuotaUsable(quota, now, now, r.state.Config().QuotaRefreshInterval) {
 		return r.recordManagedQuotaCheck(authIndex, now)
 	}
+	// 保护模式接管恢复标准，旧的额度耗尽流程也必须尊重恢复阈值和人工关闭自动恢复。
+	cfg := r.state.Config()
+	if cfg.QuotaProtectionEnabled && (!cfg.QuotaAutoRecover || !quotaMeetsRecoveryThreshold(quota, cfg)) {
+		return r.recordManagedQuotaCheck(authIndex, now)
+	}
 	raw["disabled"] = json.RawMessage("false")
+	delete(raw, quotaProtectionOwnerKey)
 	next, err := json.Marshal(raw)
 	if err != nil {
 		return err

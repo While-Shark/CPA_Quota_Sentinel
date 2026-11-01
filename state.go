@@ -573,6 +573,7 @@ func (s *PluginState) ApplyQuotaRefreshSuccessIfAdmissionCurrent(account Account
 	if !s.admissionCurrentLocked(account.AuthID, version) {
 		return false
 	}
+	account.QuotaProtectionPaused = quotaNeedsProtectionPause(account.Quota, NormalizeConfig(s.cfg))
 	account.Priority = s.admissionPriorityLocked(account.AuthID)
 	if !account.LastSuccessAt.IsZero() && account.LastError == "" {
 		account.Refresh = AccountRefreshState{}

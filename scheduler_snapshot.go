@@ -12,6 +12,7 @@ import (
 
 type SchedulerSnapshot struct {
 	HandleEnabled     bool
+	QuotaProtectionEnabled bool
 	Fallback          FallbackMode
 	MonthlyMode       MonthlyMode
 	Accounts          []AccountView
@@ -88,6 +89,16 @@ func schedulerPickPublished(req pluginapi.SchedulerPickRequest, now time.Time) P
 	if result.AuthID != "" {
 		return observeSchedulerDecision(snapshot, req, PickDecision{AuthID: result.AuthID, Handled: true, Reason: "selected"}, now)
 	}
+	if snapshot.QuotaProtectionEnabled {
+		for _, account := range snapshot.Accounts {
+		if !account.QuotaProtectionPaused { continue }
+		for _, candidate := range candidates {
+			if candidate.ID == account.ID && candidate.Provider == "codex" {
+			return observeSchedulerDecision(snapshot, req, PickDecision{Handled: true, Reject: true, Reason: "quota_protection"}, now)
+			}
+		}
+		}
+	}
 	if snapshot.Fallback == FallbackFillFirst {
 		return observeSchedulerDecision(snapshot, req, PickDecision{Handled: true, DelegateBuiltin: pluginapi.SchedulerBuiltinFillFirst, Reason: result.Reason, UnavailableSummary: fallbackUnavailableSummary(*snapshot, candidates, now)}, now)
 	}
@@ -128,6 +139,8 @@ func fallbackUnavailableSummary(snapshot SchedulerSnapshot, candidates []Candida
 
 func accountExclusionReason(a AccountView, now time.Time) string {
 	switch {
+	case a.QuotaProtectionPaused:
+		return "quota_protection"
 	case a.AuthBlocked:
 		return "auth_failure"
 	case a.Circuit == CircuitOpen:
@@ -166,7 +179,7 @@ func schedulerSnapshotFromState(state StateSnapshot, trials *TrialRegistry) *Sch
 		activity = pump.enqueue
 		observation = pump.enqueueObservation
 	}
-	return &SchedulerSnapshot{HandleEnabled: state.Config.HandleEnabled, Fallback: state.Config.Fallback, MonthlyMode: state.Config.MonthlyMode, Accounts: accounts, ActiveHighestTier: active, Trials: trials, EvidenceIntents: globalEvidenceIntents, Activity: activity, Observation: observation}
+	return &SchedulerSnapshot{HandleEnabled: state.Config.HandleEnabled, QuotaProtectionEnabled: state.Config.QuotaProtectionEnabled, Fallback: state.Config.Fallback, MonthlyMode: state.Config.MonthlyMode, Accounts: accounts, ActiveHighestTier: active, Trials: trials, EvidenceIntents: globalEvidenceIntents, Activity: activity, Observation: observation}
 }
 
 func accountViewFromState(a AccountState, cfg Config, now time.Time, trials *TrialRegistry) AccountView {
@@ -196,6 +209,7 @@ func accountViewFromState(a AccountState, cfg Config, now time.Time, trials *Tri
 		Cache: cache, LastKnownAvailable: a.LastError == "", Exhausted: exhausted,
 		ResetAt: reset, AuthBlocked: a.Refresh.AuthFailure, Circuit: circuitClass,
 		TemporaryUnavailable: a.TemporaryExhausted && a.TemporaryResetAt.After(now),
+		QuotaProtectionPaused: a.QuotaProtectionPaused || quotaNeedsProtectionPause(a.Quota, cfg),
 		Trial:                trial, Expiry: accountSortTime(a), RemainingQuota: remainingQuota(a), QuotaPressure: quotaPressure(a, now),
 	}
 }

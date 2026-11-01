@@ -23,6 +23,7 @@ var managementProvisionalRiskChanged = func(bool) {}
 
 type StatusPayload struct {
 	PluginID              string                 `json:"plugin_id"`
+	ManagementPath        string                 `json:"management_path"`
 	GeneratedAt           time.Time              `json:"generated_at"`
 	Shell                 bool                   `json:"shell,omitempty"`
 	NextAuthID            string                 `json:"next_auth_id"`
@@ -50,6 +51,7 @@ type ManagementLifecycleSnapshot struct {
 	// ManagedLifecycle projects durable managed-disable records (keyed by
 	// auth index) for the status payload.
 	ManagedLifecycle map[string]ManagedDisableRecord
+	QuotaProtection  map[string]QuotaProtectionRecord
 }
 
 type RosterLifecyclePayload struct {
@@ -83,6 +85,7 @@ type EmptyStatePayload struct {
 }
 
 type SettingsPayload struct {
+	ManagementPath                  string      `json:"management_path"`
 	HandleEnabled                   bool        `json:"handle_enabled"`
 	MonthlyMode                     MonthlyMode `json:"monthly_mode"`
 	QuotaRefreshInterval            string      `json:"quota_refresh_interval"`
@@ -105,6 +108,12 @@ type SettingsPayload struct {
 	ScheduleAcrossPriorities        bool        `json:"schedule_across_priorities"`
 	EnableManagedQuotaDisable       bool        `json:"enable_managed_quota_disable"`
 	LifecycleEventLimit             int         `json:"lifecycle_event_limit"`
+	QuotaProtectionEnabled          bool        `json:"quota_protection_enabled"`
+	FiveHourRemainingThreshold      float64     `json:"five_hour_remaining_threshold"`
+	LongWindowRemainingThreshold    float64     `json:"long_window_remaining_threshold"`
+	QuotaRecoveryThreshold          float64     `json:"quota_recovery_threshold"`
+	QuotaProtectionInterval         string      `json:"quota_protection_interval"`
+	QuotaAutoRecover                bool        `json:"quota_auto_recover"`
 
 	// Retry chain. Every field is inert until RetryEnabled is on and the chain
 	// has at least one row, so a saved payload that omits them keeps today's
@@ -157,6 +166,10 @@ type StatusAccount struct {
 	RefreshDueReason             string                 `json:"refresh_due_reason,omitempty"`
 	NextRetryText                string                 `json:"next_retry_text,omitempty"`
 	AuthFailure                  bool                   `json:"auth_failure"`
+	QuotaProtectionPaused        bool                   `json:"quota_protection_paused"`
+	QuotaProtectionReason        string                 `json:"quota_protection_reason,omitempty"`
+	QuotaProtectionDisabledAt    string                 `json:"quota_protection_disabled_at,omitempty"`
+	QuotaProtectionNextCheckAt   string                 `json:"quota_protection_next_check_at,omitempty"`
 	StatusNote                   string                 `json:"status_note,omitempty"`
 	FiveHour                     StatusWindow           `json:"five_hour"`
 	LongWindow                   StatusWindow           `json:"long_window"`
@@ -209,10 +222,16 @@ type StatusWindow struct {
 }
 
 func RegisterManagement() pluginapi.ManagementRegistrationResponse {
+	return registerManagementWithConfig(globalState.Config())
+}
+
+// registerManagementWithConfig 在宿主重配置时发布当前入口的完整路由表。
+func registerManagementWithConfig(cfg Config) pluginapi.ManagementRegistrationResponse {
+	managementBasePath := configuredManagementPath(cfg)
 	return pluginapi.ManagementRegistrationResponse{
 		Resources: []pluginapi.ResourceRoute{
 			{
-				Path:        "/status",
+				Path:        configuredResourcePath(cfg) + "/status",
 				Menu:        "Codex Scheduler",
 				Description: "Open scheduler quota status.",
 			},
@@ -253,7 +272,7 @@ func handleManagementRequest(store *PluginState, req pluginapi.ManagementRequest
 	}
 
 	method := strings.ToUpper(req.Method)
-	path := normalizeManagementPath(req.Path)
+	path := normalizeConfiguredManagementPath(req.Path, store.Config())
 	if isResourcePath(req.Path) && !resourceRouteAllowed(method, path) {
 		return jsonManagementResponse(http.StatusNotFound, map[string]string{"error": "not found"})
 	}
@@ -336,6 +355,7 @@ func resourceRouteAllowed(method, path string) bool {
 
 func SettingsFromConfig(cfg Config) SettingsPayload {
 	return SettingsPayload{
+		ManagementPath:                  configuredManagementPath(cfg),
 		HandleEnabled:                   cfg.HandleEnabled,
 		MonthlyMode:                     cfg.MonthlyMode,
 		QuotaRefreshInterval:            cfg.QuotaRefreshInterval.String(),
@@ -358,6 +378,12 @@ func SettingsFromConfig(cfg Config) SettingsPayload {
 		ScheduleAcrossPriorities:        cfg.ScheduleAcrossPriorities,
 		EnableManagedQuotaDisable:       cfg.EnableManagedQuotaDisable,
 		LifecycleEventLimit:             cfg.LifecycleEventLimit,
+		QuotaProtectionEnabled:          cfg.QuotaProtectionEnabled,
+		FiveHourRemainingThreshold:      cfg.FiveHourRemainingThreshold,
+		LongWindowRemainingThreshold:    cfg.LongWindowRemainingThreshold,
+		QuotaRecoveryThreshold:          cfg.QuotaRecoveryThreshold,
+		QuotaProtectionInterval:         cfg.QuotaProtectionInterval.String(),
+		QuotaAutoRecover:                cfg.QuotaAutoRecover,
 		RetryEnabled:                    cfg.RetryEnabled,
 		RetryShadow:                     cfg.RetryShadow,
 		RetryAlways:                     cfg.RetryAlways,
@@ -439,6 +465,23 @@ func ConfigFromSettings(base Config, payload SettingsPayload) (Config, error) {
 	cfg.HandleEnabled = payload.HandleEnabled
 	cfg.ScheduleAcrossPriorities = payload.ScheduleAcrossPriorities
 	cfg.EnableManagedQuotaDisable = payload.EnableManagedQuotaDisable
+	cfg.QuotaProtectionEnabled = payload.QuotaProtectionEnabled
+	if payload.QuotaProtectionEnabled || payload.QuotaRecoveryThreshold > 0 || payload.FiveHourRemainingThreshold > 0 || payload.LongWindowRemainingThreshold > 0 {
+		cfg.FiveHourRemainingThreshold = payload.FiveHourRemainingThreshold
+		cfg.LongWindowRemainingThreshold = payload.LongWindowRemainingThreshold
+		cfg.QuotaRecoveryThreshold = payload.QuotaRecoveryThreshold
+		cfg.QuotaAutoRecover = payload.QuotaAutoRecover
+		if cfg.FiveHourRemainingThreshold < 0 || cfg.FiveHourRemainingThreshold > 100 || cfg.LongWindowRemainingThreshold < 0 || cfg.LongWindowRemainingThreshold > 100 || cfg.QuotaRecoveryThreshold < 0 || cfg.QuotaRecoveryThreshold > 100 || cfg.QuotaRecoveryThreshold <= cfg.FiveHourRemainingThreshold || cfg.QuotaRecoveryThreshold <= cfg.LongWindowRemainingThreshold {
+			return Config{}, jsonError("quota thresholds must be 0..100 and recovery must exceed both pause thresholds")
+		}
+	}
+	if payload.QuotaProtectionInterval != "" {
+		d, err := time.ParseDuration(payload.QuotaProtectionInterval)
+		if err != nil || d <= 0 {
+			return Config{}, jsonError("quota_protection_interval must be a positive duration")
+		}
+		cfg.QuotaProtectionInterval = d
+	}
 	if payload.LifecycleEventLimit > 0 {
 		cfg.LifecycleEventLimit = payload.LifecycleEventLimit
 	}
@@ -648,6 +691,8 @@ func handleImportState(store *PluginState, body []byte, now time.Time) pluginapi
 	if _, err := validateQuotaEndpoint(state.Config.QuotaEndpoint); err != nil {
 		return jsonManagementResponse(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
+	// 后台入口仅由 CPA 插件配置控制，导入普通设置不能变更宿主路由。
+	state.Config.ManagementPath = store.Config().ManagementPath
 	state = normalizePluginDiskState(state)
 	if err := SaveUserData(semanticStatePaths(defaultStatePath()).UserData, state); err != nil {
 		return jsonManagementResponse(http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -673,6 +718,7 @@ func buildStatusPayload(snapshot StateSnapshot, ordered []ScheduledAccount, life
 
 	payload := StatusPayload{
 		PluginID:              PluginID,
+		ManagementPath:        configuredManagementPath(snapshot.Config),
 		GeneratedAt:           snapshot.Now,
 		MonthlyMode:           snapshot.Config.MonthlyMode,
 		HandleEnabled:         snapshot.Config.HandleEnabled,
@@ -790,6 +836,24 @@ func buildStatusPayload(snapshot StateSnapshot, ordered []ScheduledAccount, life
 				status.ManagedDisable = summary
 			}
 		}
+		if lifecycle != nil && account.AuthIndex != "" && lifecycle.QuotaProtection != nil {
+			if record, ok := lifecycle.QuotaProtection[account.AuthIndex]; ok {
+				status.QuotaProtectionPaused = true
+				status.QuotaProtectionReason = "受保护额度窗口低于设定阈值"
+				if !record.DisabledAt.IsZero() {
+					status.QuotaProtectionDisabledAt = record.DisabledAt.UTC().Format(time.RFC3339)
+				}
+				if !record.NextQuotaCheckAt.IsZero() {
+					status.QuotaProtectionNextCheckAt = record.NextQuotaCheckAt.UTC().Format(time.RFC3339)
+				}
+			}
+		}
+		if snapshot.Config.QuotaProtectionEnabled && (scheduled.selectionView.QuotaProtectionPaused || account.QuotaProtectionPaused) {
+			status.QuotaProtectionPaused = true
+			if status.QuotaProtectionReason == "" {
+				status.QuotaProtectionReason = "受保护额度窗口低于设定阈值"
+			}
+		}
 		payload.Accounts = append(payload.Accounts, status)
 	}
 	if len(payload.Accounts) == 0 {
@@ -876,6 +940,9 @@ func accountStatusNote(account AccountState, dueReason string, snapshot StateSna
 	cfg := NormalizeConfig(snapshot.Config)
 	if account.Refresh.AuthFailure {
 		return "认证信息异常，请重新登录。"
+	}
+	if cfg.QuotaProtectionEnabled && (account.QuotaProtectionPaused || quotaNeedsProtectionPause(account.Quota, cfg)) {
+		return "剩余额度低于设定的保护阈值，已暂停参与路由。"
 	}
 	if dueReason == "retry_wait" && !account.Refresh.NextRetryAt.IsZero() {
 		return "上次额度刷新失败，调度器正在等待下次自动重试。"
@@ -1065,12 +1132,13 @@ func RenderStatusHTML(payload StatusPayload) []byte {
 func BuildStatusShellPayload(now time.Time) StatusPayload {
 	cfg := DefaultConfig()
 	return StatusPayload{
-		PluginID:      PluginID,
-		GeneratedAt:   now,
-		Shell:         true,
-		MonthlyMode:   cfg.MonthlyMode,
-		HandleEnabled: cfg.HandleEnabled,
-		Settings:      SettingsFromConfig(cfg),
+		PluginID:       PluginID,
+		ManagementPath: configuredManagementPath(activeConfig()),
+		GeneratedAt:    now,
+		Shell:          true,
+		MonthlyMode:    cfg.MonthlyMode,
+		HandleEnabled:  cfg.HandleEnabled,
+		Settings:       SettingsFromConfig(cfg),
 		EmptyState: EmptyStatePayload{
 			Reason:  "management_key_required",
 			Title:   "需要 CPA 管理密钥",
@@ -1081,10 +1149,13 @@ func BuildStatusShellPayload(now time.Time) StatusPayload {
 
 func handleStatusRequest(store *PluginState, req pluginapi.ManagementRequest, now time.Time, lifecycles ...*ManagementLifecycleSnapshot) pluginapi.ManagementResponse {
 	if isResourcePath(req.Path) {
+		payload := BuildStatusShellPayload(now)
+		payload.ManagementPath = configuredManagementPath(store.Config())
+		payload.Settings.ManagementPath = configuredManagementPath(store.Config())
 		return pluginapi.ManagementResponse{
 			StatusCode: http.StatusOK,
 			Headers:    htmlManagementHeaders(),
-			Body:       RenderStatusHTML(BuildStatusShellPayload(now)),
+			Body:       RenderStatusHTML(payload),
 		}
 	}
 	payload := buildCurrentStatusPayload(store, now)
@@ -1412,4 +1483,3 @@ func formatTime(t time.Time) string {
 	}
 	return t.UTC().Format(time.RFC3339)
 }
-

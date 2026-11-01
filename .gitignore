@@ -1,6 +1,9 @@
 # Build outputs
 build/
 dist/
+.tmp/
+.gocache/
+.gotmp/
 .worktrees/
 *.exe
 *.dll

@@ -154,6 +154,7 @@ type AccountState struct {
 	Stale              bool
 	TemporaryExhausted bool
 	TemporaryResetAt   time.Time
+	QuotaProtectionPaused bool
 	Circuit            CircuitBreakerState
 	Refresh            AccountRefreshState
 	ResetProbes        map[WindowKind]ResetProbeState

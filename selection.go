@@ -52,6 +52,7 @@ type AccountView struct {
 	AuthBlocked          bool
 	Circuit              CircuitClass
 	TemporaryUnavailable bool
+	QuotaProtectionPaused bool
 	Trial                TrialState
 	Expiry               time.Time
 	RemainingQuota       float64
@@ -72,7 +73,7 @@ type SelectionResult struct {
 }
 
 func ClassifyAccount(a AccountView, now time.Time) AvailabilityClass {
-	if a.AuthBlocked || a.Circuit == CircuitOpen || a.TemporaryUnavailable || a.Trial != TrialNone {
+	if a.AuthBlocked || a.Circuit == CircuitOpen || a.TemporaryUnavailable || a.QuotaProtectionPaused || a.Trial != TrialNone {
 		return Excluded
 	}
 	if a.Exhausted && a.ResetAt.After(now) {

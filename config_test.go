@@ -291,6 +291,16 @@ func TestDecodeConfigRejectsNonChatGPTQuotaEndpoint(t *testing.T) {
 	}
 }
 
+func TestDecodeConfigValidatesManagementPath(t *testing.T) {
+	cfg, err := DecodeConfig([]byte("management_path: /private/sentinel_1"))
+	if err != nil || cfg.ManagementPath != "/private/sentinel_1" {
+		t.Fatalf("DecodeConfig = %#v, %v", cfg, err)
+	}
+	if cfg := NormalizeConfig(Config{ManagementPath: "/bad/path?query=1"}); cfg.ManagementPath != managementBasePath {
+		t.Fatalf("invalid stored path normalized to %q", cfg.ManagementPath)
+	}
+}
+
 func TestPluginRegistrationDeclaresCapabilitiesAndFields(t *testing.T) {
 	reg := PluginRegistration()
 	if reg.SchemaVersion != pluginabi.SchemaVersion {
@@ -299,8 +309,8 @@ func TestPluginRegistrationDeclaresCapabilitiesAndFields(t *testing.T) {
 	if reg.Metadata.Name == "" || reg.Metadata.Version == "" || reg.Metadata.Author == "" || reg.Metadata.GitHubRepository == "" {
 		t.Fatalf("metadata missing required CPA fields: %#v", reg.Metadata)
 	}
-	if len(reg.Metadata.ConfigFields) != 0 {
-		t.Fatalf("ConfigFields len = %d, want 0; fields=%#v", len(reg.Metadata.ConfigFields), reg.Metadata.ConfigFields)
+	if len(reg.Metadata.ConfigFields) == 0 || reg.Metadata.ConfigFields[0].Name != "management_path" {
+		t.Fatalf("ConfigFields missing management_path: %#v", reg.Metadata.ConfigFields)
 	}
 	if !reg.Capabilities.Scheduler || !reg.Capabilities.UsagePlugin || !reg.Capabilities.ManagementAPI {
 		t.Fatalf("capabilities = %#v, want scheduler, usage_plugin, management_api", reg.Capabilities)

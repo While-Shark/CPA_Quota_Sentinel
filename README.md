@@ -1,13 +1,84 @@
-# Codex Quota Scheduler
+# CPA Quota Sentinel
 
-[简体中文](README.zh-CN.md) | English | [Changelog](CHANGELOG.md)
+English | [简体中文](README.zh-CN.md) | [Changelog](CHANGELOG.md)
 
 `codex-quota-scheduler` is a dynamic library plugin for CLIProxyAPI (CPA). It
 provides a quota-aware, optimized Fill First scheduler for Codex accounts, so
 CPA selects accounts by real usability instead of relying on a static account
 order alone.
 
-## What's New
+## Quota Sentinel extension
+
+This repository is the While-Shark edition, based on upstream commit
+`35fad07ec4d45e33875f34a37310bd2b3942704a`. The plugin ID and library filename
+remain `codex-quota-scheduler` for compatibility.
+
+- Separate remaining-quota pause thresholds for 5-hour and weekly/monthly windows (20% each).
+- Fresh quota verification after reset before recovery (30% remaining by default).
+- Accounts without a 5-hour window are supported. Previously observed windows cannot silently disappear during recovery.
+- Persistent pause evidence, credential fingerprints and ownership markers for managed auth disabling.
+- Custom management paths, account protection status, logs and policy JSON export.
+- English and Simplified Chinese documentation and management UI.
+
+**Protection is opt-in:** turn on **Low quota protection** in the plugin's scheduling settings and save.
+The default pause thresholds are 20%, recovery is 30%, and protected-account checks run every 5 minutes.
+Normal active-account polling remains 30 minutes; the 5-minute interval concerns paused-account recovery checks.
+The current code has local tests and a Windows DLL build verified; live CPA deployment has not been accepted yet.
+
+### Quick start
+
+1. Build this repository with Go 1.26 and a C compiler (see Development below). The upstream store package does not include this extension.
+2. Stop CPA before replacing a loaded library. Copy the matching library to the CPA plugin directory for your OS and architecture.
+3. Enable `plugins.enabled` and `plugins.configs.codex-quota-scheduler.enabled` in CPA, then restart it.
+4. Open `/v0/resource/plugins/codex-quota-scheduler/status`, enter the CPA management key, enable protection in scheduling settings and save.
+5. Refresh account quotas from the page and check account status and logs.
+
+Optional custom path in CPA's `config.yaml` (fields belong directly to the plugin subtree):
+
+```yaml
+plugins:
+  enabled: true
+  configs:
+    codex-quota-scheduler:
+      enabled: true
+      priority: 1
+      management_path: /my-private-quota
+```
+
+After changing the path in CPA's plugin configuration, use:
+
+- Page: `/v0/resource/plugins/codex-quota-scheduler/my-private-quota/status`
+- Authenticated API: `/v0/management/my-private-quota/status?format=json`
+
+The old routes are rejected after the host re-registers routes. A custom path reduces predictable endpoint discovery;
+it does not replace management-key authentication, HTTPS or host rate limiting.
+The public resource serves only a static page shell; account data and mutations require the management key.
+The CPA plugin configuration modal supports a path field but not native action buttons.
+An **Open management** link is provided inside the plugin settings page.
+
+### Protection settings
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `quota_protection_enabled` | `false` | Enable explicitly in scheduling settings. |
+| `five_hour_remaining_threshold` | `20` | Pause when known 5-hour remaining percentage is at or below this value. |
+| `long_window_remaining_threshold` | `20` | Pause when known weekly/monthly remaining percentage is at or below this value. |
+| `quota_recovery_threshold` | `30` | Fresh evidence must meet this value and exceed both pause thresholds. |
+| `quota_protection_interval` | `5m` | Recheck interval for protected accounts. |
+| `quota_auto_recover` | `true` | Restore only accounts with matching plugin ownership. |
+
+Saved page settings persist and take precedence over startup YAML for scheduling options;
+`management_path` remains owned by CPA's plugin configuration. Unknown quota is not unlimited quota.
+Recovery waits for the triggering reset deadline, then verifies the recorded windows and any newly returned windows.
+Missing reset times, missing required windows, changed credentials or lost ownership keep automatic recovery blocked.
+The host offers no atomic compare-and-save for auth files; re-reading before saving narrows, but cannot eliminate, concurrent operator changes.
+
+## Upstream reference
+
+The following sections describe the inherited scheduler. New protection rules above take precedence where behavior differs.
+Upstream release downloads contain upstream code, not this repository's changes.
+
+## Upstream release history
 
 v0.4.1 fixes subpath deployments and the preflight version parsing.
 Full release history: [CHANGELOG.md](CHANGELOG.md).

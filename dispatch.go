@@ -103,7 +103,10 @@ func configure(raw []byte) error {
 	}
 	disk, loadedDisk, err := loadUserDataWithMigration(semanticStatePaths(defaultStatePath()), OSFileHooks(), nil)
 	if err == nil && loadedDisk {
+		// 后台入口由 CPA 配置拥有，磁盘中的普通页面设置不能覆盖宿主更新。
+		managementPath := cfg.ManagementPath
 		cfg = disk.Config
+		cfg.ManagementPath = managementPath
 	} else {
 		disk = PluginDiskState{Config: cfg}
 	}
@@ -147,6 +150,8 @@ func handleSchedulerPick(raw []byte) ([]byte, error) {
 		AuthID:          decision.AuthID,
 		DelegateBuiltin: decision.DelegateBuiltin,
 		Handled:         decision.Handled,
+		Reject:          decision.Reject,
+		RejectReason:    decision.Reason,
 	})
 }
 
@@ -303,6 +308,7 @@ func handleManagementHandle(raw []byte) ([]byte, error) {
 		if owner := refresher.lifecycleRefresher(); owner.runtimeStore != nil {
 			if persisted, err := owner.runtimeStore.PersistentSnapshot(); err == nil {
 				lifecycle.ManagedLifecycle = persisted.ManagedLifecycle
+				lifecycle.QuotaProtection = persisted.QuotaProtection
 			}
 		}
 	}

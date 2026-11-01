@@ -11,6 +11,7 @@ type PickDecision struct {
 	AuthID          string
 	Handled         bool
 	DelegateBuiltin string
+	Reject          bool
 	Reason          string
 	Ordered         []ScheduledAccount
 	// UnavailableSummary explains a fallback decision from the published
@@ -109,6 +110,13 @@ func PickCodexAccount(req pluginapi.SchedulerPickRequest, snapshot StateSnapshot
 		}
 	}
 
+	if snapshot.Config.QuotaProtectionEnabled {
+		for _, account := range ordered {
+		if account.selectionView.QuotaProtectionPaused {
+			return PickDecision{Handled: true, Reject: true, Reason: "quota_protection", Ordered: ordered}
+		}
+		}
+	}
 	if snapshot.Config.Fallback == FallbackFillFirst {
 		return PickDecision{
 			Handled:         true,
@@ -191,6 +199,9 @@ func buildOrderedAccounts(req pluginapi.SchedulerPickRequest, snapshot StateSnap
 			available = false
 			reason = "quota_probe_wait"
 			sortTime = time.Time{}
+		}
+		if snapshot.Config.QuotaProtectionEnabled && view.QuotaProtectionPaused && available {
+			queueStatus, available, reason = QueueStatusUnavailable, false, "quota_protection"
 		}
 		ordered = append(ordered, ScheduledAccount{
 			AuthID:            candidate.ID,

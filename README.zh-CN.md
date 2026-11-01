@@ -1,4 +1,4 @@
-# Codex 额度调度器
+# CPA 额度哨兵 · CPA Quota Sentinel
 
 简体中文 | [English](README.md) | [更新日志](CHANGELOG.zh-CN.md)
 
@@ -6,7 +6,75 @@
 账号提供额度感知的优化版 Fill First 调度，让 CPA 按账号的真实可用性选择账号，
 而不只是依赖固定的账号顺序。
 
-## 当前版本
+## 本仓库新增功能
+
+本仓库为 While-Shark 二次开发版，基于上游提交
+`35fad07ec4d45e33875f34a37310bd2b3942704a`。为兼容 CPA，插件 ID 和动态库名仍为 `codex-quota-scheduler`。
+
+- 5 小时与周/月窗口分别配置剩余额度暂停阈值，默认均为 20%。
+- 重置后重新查询额度，达到恢复阈值（默认 30%）才允许恢复。
+- 支持没有 5 小时窗口的账号；已知窗口在恢复时缺失不会被当作无限额度。
+- 持久化暂停记录、凭据指纹及插件所有权标记。
+- 自定义管理路径、暂停状态展示、日志及策略 JSON 导出。
+- 英文为默认 README，提供简体中文文档和中英文管理界面。
+
+**额度保护默认关闭，需在插件页面的“调度设置”中开启并保存。**
+暂停阈值默认 20%，恢复阈值默认 30%，保护中账号每 5 分钟复核。
+普通活跃账号轮询仍为 30 分钟，5 分钟并非所有账号的全局扫描周期。
+本地测试和 Windows DLL 构建已验证，尚未完成真实 CPA 部署验收。
+
+### 快速使用
+
+1. 使用 Go 1.26 和 C 编译器构建本仓库。上游商店安装包不包含本仓库的新增功能。
+2. 停止 CPA，将对应系统和架构的动态库放进 CPA 插件目录，再启动 CPA。
+3. 在 CPA 配置中启用插件。
+4. 访问 `/v0/resource/plugins/codex-quota-scheduler/status`，填入 CPA 管理密钥。
+5. 在“调度设置”打开低额度保护，确认阈值后保存，再刷新账号额度并查看状态与日志。
+
+自定义路径可在 CPA 插件配置弹窗设置，也可直接写入 CPA 的 `config.yaml`。
+字段直接放在插件配置下，不增加 `config:` 嵌套：
+
+```yaml
+plugins:
+  enabled: true
+  configs:
+    codex-quota-scheduler:
+      enabled: true
+      priority: 1
+      management_path: /my-private-quota
+```
+
+修改后使用：
+
+- 页面：`/v0/resource/plugins/codex-quota-scheduler/my-private-quota/status`
+- 鉴权 API：`/v0/management/my-private-quota/status?format=json`
+
+宿主重新注册路由后旧地址失效。自定义路径减少默认入口被发现的机会，仍需管理密钥、HTTPS 与宿主限流。
+公开资源仅为静态页面壳，账号数据和写操作需要管理密钥。
+CPA 的插件配置弹窗不支持原生动作按钮，“打开后台”链接位于插件的设置页面。
+
+### 额度保护配置
+
+| 字段 | 默认值 | 用途 |
+| --- | --- | --- |
+| `quota_protection_enabled` | `false` | 在调度设置中明确开启。 |
+| `five_hour_remaining_threshold` | `20` | 已知 5 小时窗口剩余百分比小于等于此值时暂停。 |
+| `long_window_remaining_threshold` | `20` | 已知周/月窗口剩余百分比小于等于此值时暂停。 |
+| `quota_recovery_threshold` | `30` | 恢复需达到此值，且必须大于两个暂停阈值。 |
+| `quota_protection_interval` | `5m` | 保护中账号的后台复核间隔。 |
+| `quota_auto_recover` | `true` | 仅恢复插件拥有明确所有权的账号。 |
+
+页面已保存的调度设置优先于启动 YAML，`management_path` 始终由 CPA 插件配置控制。
+恢复先等待触发保护窗口的重置时间，再核实已记录及新出现的窗口。
+重置时间未知、已有窗口缺失、凭据轮换或所有权丢失时停止自动恢复。
+宿主不提供 auth 原子比较写接口；写前重读可缩小与人工改动的并发窗口，但不能完全消除。
+
+## 上游功能参考
+
+以下为继承的上游调度说明；如与新增保护策略有差异，以前述规则为准。
+上游发布下载不包含本仓库的二次开发功能。
+
+## 上游版本记录
 
 v0.4.1 修复子路径部署与前置检查的版本解析问题。
 完整更新历史见 [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)。

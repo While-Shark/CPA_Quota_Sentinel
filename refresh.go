@@ -1391,6 +1391,7 @@ func (r *QuotaRefresher) Start() {
 			}
 			select {
 			case <-timerC:
+				_ = r.lifecycleRefresher().RecoverQuotaProtectionAccounts(context.Background())
 				// Managed-quota recovery runs before normal deadlines so
 				// disabled accounts return as soon as their quota recovers,
 				// even while normal refresh is dormant. It routes to the
@@ -1627,6 +1628,7 @@ func (r *QuotaRefresher) nextRefreshLoopDelay() (time.Duration, bool) {
 	if managed := r.managedRecoveryDeadline(now); !managed.IsZero() && (deadline.IsZero() || managed.Before(deadline)) {
 		deadline = managed
 	}
+	if protected := r.quotaProtectionDeadline(now); !protected.IsZero() && (deadline.IsZero() || protected.Before(deadline)) { deadline = protected }
 	if deadline.IsZero() {
 		return 0, false
 	}
@@ -1935,6 +1937,9 @@ func (r *QuotaRefresher) refreshAuthVersionedHeld(auth pluginapi.HostAuthFileEnt
 	account.LastError = ""
 	account.LastSuccessAt = r.now()
 	if r.state.ApplyQuotaRefreshSuccessIfAdmissionCurrent(account, version, r.now()) {
+		if owner := r.lifecycleRefresher(); owner != nil && quotaNeedsProtectionPause(quota, r.state.Config()) {
+			go func() { _ = owner.ApplyQuotaProtectionDisable(context.Background(), account.AuthIndex, quota) }()
+		}
 		globalTrials.ObserveEvidence(account.Instance, Evidence{Kind: EvidenceReliableQuotaWriteback, At: r.now()})
 		publishSchedulerState(r.state, highestTierSet(r.runtimeRoster()), r.now())
 		r.recordAdmissionLog(account.AuthID, version, "info", "quota.refresh_success", "账号额度刷新成功", map[string]any{"auth_id": account.AuthID})

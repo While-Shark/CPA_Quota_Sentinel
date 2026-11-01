@@ -79,6 +79,25 @@ func TestManagementRegisterExposesStatusResourceAndRoutes(t *testing.T) {
 	}
 }
 
+func TestRegisterManagementUsesConfiguredPath(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ManagementPath = "/private/sentinel"
+	registered := registerManagementWithConfig(cfg)
+	want := "/private/sentinel/settings"
+	found := false
+	for _, route := range registered.Routes {
+		if route.Path == want {
+			found = true
+		}
+		if route.Path == managementBasePath+"/settings" {
+			t.Fatal("default route remained registered")
+		}
+	}
+	if !found {
+		t.Fatalf("missing configured route %s", want)
+	}
+}
+
 func TestManagementRoutesDispatchFullCPAPaths(t *testing.T) {
 	now := time.Date(2026, 6, 21, 9, 0, 0, 0, time.UTC)
 	store := NewPluginState(DefaultConfig())

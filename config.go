@@ -29,6 +29,7 @@ type MonthlyMode string
 type FallbackMode string
 
 type Config struct {
+	ManagementPath       string
 	HandleEnabled        bool
 	QuotaRefreshInterval time.Duration
 	// StaleAfter classifies cache age and permits pick-time recovery. It does
@@ -65,8 +66,14 @@ type Config struct {
 	// level after a confirmed usage_limit_reached and re-enabling them only
 	// from fresh usable quota. Default false: the feature writes host auth
 	// files.
-	EnableManagedQuotaDisable bool
-	LifecycleEventLimit       int
+	EnableManagedQuotaDisable    bool
+	LifecycleEventLimit          int
+	QuotaProtectionEnabled       bool
+	FiveHourRemainingThreshold   float64
+	LongWindowRemainingThreshold float64
+	QuotaRecoveryThreshold       float64
+	QuotaProtectionInterval      time.Duration
+	QuotaAutoRecover             bool
 
 	// Retry chain. RetryEnabled is the kill switch: when it is false every
 	// request keeps today's behavior. RetryChain is empty by default, which is
@@ -111,29 +118,36 @@ type registrationCapabilities struct {
 }
 
 type rawConfig struct {
-	HandleEnabled                   *bool  `yaml:"handle_enabled"`
-	QuotaRefreshInterval            string `yaml:"quota_refresh_interval"`
-	StaleAfter                      string `yaml:"stale_after"`
-	MonthlyMode                     string `yaml:"monthly_mode"`
-	Fallback                        string `yaml:"fallback"`
-	EnableUsageFeedback             *bool  `yaml:"enable_usage_feedback"`
-	EnableResetProbe                *bool  `yaml:"enable_reset_probe"`
-	ProbeOnProvisionalRoster        *bool  `yaml:"probe_on_provisional_roster"`
-	MaxRefreshConcurrency           *int   `yaml:"max_refresh_concurrency"`
-	QuotaEndpoint                   string `yaml:"quota_endpoint"`
-	RefreshActiveWindow             string `yaml:"refresh_active_window"`
-	RefreshAfterResetDelay          string `yaml:"refresh_after_reset_delay"`
-	RefreshRetryDelays              string `yaml:"refresh_retry_delays"`
-	AuthFailureRetryInterval        string `yaml:"auth_failure_retry_interval"`
-	RefreshOnStartup                *bool  `yaml:"refresh_on_startup"`
-	CircuitFailureThreshold         *int   `yaml:"circuit_failure_threshold"`
-	CircuitOpenDuration             string `yaml:"circuit_open_duration"`
-	CircuitHalfOpenSuccessThreshold *int   `yaml:"circuit_half_open_success_threshold"`
-	MaxLogEntries                   *int   `yaml:"max_log_entries"`
-	LogRetention                    string `yaml:"log_retention"`
-	ScheduleAcrossPriorities        *bool  `yaml:"schedule_across_priorities"`
-	EnableManagedQuotaDisable       *bool  `yaml:"enable_managed_quota_disable"`
-	LifecycleEventLimit             *int   `yaml:"lifecycle_event_limit"`
+	ManagementPath                  string   `yaml:"management_path"`
+	HandleEnabled                   *bool    `yaml:"handle_enabled"`
+	QuotaRefreshInterval            string   `yaml:"quota_refresh_interval"`
+	StaleAfter                      string   `yaml:"stale_after"`
+	MonthlyMode                     string   `yaml:"monthly_mode"`
+	Fallback                        string   `yaml:"fallback"`
+	EnableUsageFeedback             *bool    `yaml:"enable_usage_feedback"`
+	EnableResetProbe                *bool    `yaml:"enable_reset_probe"`
+	ProbeOnProvisionalRoster        *bool    `yaml:"probe_on_provisional_roster"`
+	MaxRefreshConcurrency           *int     `yaml:"max_refresh_concurrency"`
+	QuotaEndpoint                   string   `yaml:"quota_endpoint"`
+	RefreshActiveWindow             string   `yaml:"refresh_active_window"`
+	RefreshAfterResetDelay          string   `yaml:"refresh_after_reset_delay"`
+	RefreshRetryDelays              string   `yaml:"refresh_retry_delays"`
+	AuthFailureRetryInterval        string   `yaml:"auth_failure_retry_interval"`
+	RefreshOnStartup                *bool    `yaml:"refresh_on_startup"`
+	CircuitFailureThreshold         *int     `yaml:"circuit_failure_threshold"`
+	CircuitOpenDuration             string   `yaml:"circuit_open_duration"`
+	CircuitHalfOpenSuccessThreshold *int     `yaml:"circuit_half_open_success_threshold"`
+	MaxLogEntries                   *int     `yaml:"max_log_entries"`
+	LogRetention                    string   `yaml:"log_retention"`
+	ScheduleAcrossPriorities        *bool    `yaml:"schedule_across_priorities"`
+	EnableManagedQuotaDisable       *bool    `yaml:"enable_managed_quota_disable"`
+	LifecycleEventLimit             *int     `yaml:"lifecycle_event_limit"`
+	QuotaProtectionEnabled          *bool    `yaml:"quota_protection_enabled"`
+	FiveHourRemainingThreshold      *float64 `yaml:"five_hour_remaining_threshold"`
+	LongWindowRemainingThreshold    *float64 `yaml:"long_window_remaining_threshold"`
+	QuotaRecoveryThreshold          *float64 `yaml:"quota_recovery_threshold"`
+	QuotaProtectionInterval         string   `yaml:"quota_protection_interval"`
+	QuotaAutoRecover                *bool    `yaml:"quota_auto_recover"`
 
 	RetryEnabled        *bool           `yaml:"retry_enabled"`
 	RetryShadow         *bool           `yaml:"retry_shadow"`
@@ -150,6 +164,7 @@ type rawConfig struct {
 
 func DefaultConfig() Config {
 	return Config{
+		ManagementPath:                  managementBasePath,
 		HandleEnabled:                   true,
 		QuotaRefreshInterval:            30 * time.Minute,
 		StaleAfter:                      5 * time.Hour,
@@ -172,6 +187,12 @@ func DefaultConfig() Config {
 		ScheduleAcrossPriorities:        true,
 		EnableManagedQuotaDisable:       false,
 		LifecycleEventLimit:             50,
+		QuotaProtectionEnabled:          false,
+		FiveHourRemainingThreshold:      20,
+		LongWindowRemainingThreshold:    20,
+		QuotaRecoveryThreshold:          30,
+		QuotaProtectionInterval:         5 * time.Minute,
+		QuotaAutoRecover:                true,
 
 		RetryEnabled:        false,
 		RetryShadow:         false,
@@ -188,8 +209,23 @@ func DefaultConfig() Config {
 
 func NormalizeConfig(cfg Config) Config {
 	defaults := DefaultConfig()
+	if _, err := validateManagementPath(cfg.ManagementPath); err != nil || cfg.ManagementPath == "" {
+		cfg.ManagementPath = defaults.ManagementPath
+	}
 	if cfg.QuotaRefreshInterval <= 0 {
 		cfg.QuotaRefreshInterval = defaults.QuotaRefreshInterval
+	}
+	if cfg.FiveHourRemainingThreshold < 0 || cfg.FiveHourRemainingThreshold > 100 {
+		cfg.FiveHourRemainingThreshold = defaults.FiveHourRemainingThreshold
+	}
+	if cfg.LongWindowRemainingThreshold < 0 || cfg.LongWindowRemainingThreshold > 100 {
+		cfg.LongWindowRemainingThreshold = defaults.LongWindowRemainingThreshold
+	}
+	if cfg.QuotaRecoveryThreshold < 0 || cfg.QuotaRecoveryThreshold > 100 {
+		cfg.QuotaRecoveryThreshold = defaults.QuotaRecoveryThreshold
+	}
+	if cfg.QuotaProtectionInterval <= 0 {
+		cfg.QuotaProtectionInterval = defaults.QuotaProtectionInterval
 	}
 	if cfg.StaleAfter <= 0 {
 		cfg.StaleAfter = defaults.StaleAfter
@@ -265,6 +301,13 @@ func DecodeConfig(raw []byte) (Config, error) {
 	var decoded rawConfig
 	if err := yaml.Unmarshal(raw, &decoded); err != nil {
 		return Config{}, err
+	}
+	if decoded.ManagementPath != "" {
+		path, err := validateManagementPath(decoded.ManagementPath)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.ManagementPath = path
 	}
 	if decoded.HandleEnabled != nil {
 		cfg.HandleEnabled = *decoded.HandleEnabled
@@ -412,6 +455,36 @@ func DecodeConfig(raw []byte) (Config, error) {
 			return Config{}, fmt.Errorf("lifecycle_event_limit must be positive")
 		}
 		cfg.LifecycleEventLimit = *decoded.LifecycleEventLimit
+	}
+	if decoded.QuotaProtectionEnabled != nil {
+		cfg.QuotaProtectionEnabled = *decoded.QuotaProtectionEnabled
+	}
+	if decoded.FiveHourRemainingThreshold != nil {
+		cfg.FiveHourRemainingThreshold = *decoded.FiveHourRemainingThreshold
+	}
+	if decoded.LongWindowRemainingThreshold != nil {
+		cfg.LongWindowRemainingThreshold = *decoded.LongWindowRemainingThreshold
+	}
+	if decoded.QuotaRecoveryThreshold != nil {
+		cfg.QuotaRecoveryThreshold = *decoded.QuotaRecoveryThreshold
+	}
+	if decoded.QuotaAutoRecover != nil {
+		cfg.QuotaAutoRecover = *decoded.QuotaAutoRecover
+	}
+	for name, value := range map[string]float64{"five_hour_remaining_threshold": cfg.FiveHourRemainingThreshold, "long_window_remaining_threshold": cfg.LongWindowRemainingThreshold, "quota_recovery_threshold": cfg.QuotaRecoveryThreshold} {
+		if value < 0 || value > 100 {
+			return Config{}, fmt.Errorf("%s must be between 0 and 100", name)
+		}
+	}
+	if cfg.QuotaRecoveryThreshold <= cfg.FiveHourRemainingThreshold || cfg.QuotaRecoveryThreshold <= cfg.LongWindowRemainingThreshold {
+		return Config{}, fmt.Errorf("quota_recovery_threshold must be greater than both pause thresholds")
+	}
+	if decoded.QuotaProtectionInterval != "" {
+		d, err := time.ParseDuration(decoded.QuotaProtectionInterval)
+		if err != nil || d <= 0 {
+			return Config{}, fmt.Errorf("quota_protection_interval must be positive")
+		}
+		cfg.QuotaProtectionInterval = d
 	}
 	if decoded.RetryEnabled != nil {
 		cfg.RetryEnabled = *decoded.RetryEnabled
@@ -575,6 +648,7 @@ func PluginRegistration() registration {
 			Author:           "Jeffery",
 			GitHubRepository: "https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler",
 			Logo:             "https://raw.githubusercontent.com/router-for-me/CLIProxyAPI/main/docs/logo.png",
+			ConfigFields:     managementConfigFields(),
 		},
 		Capabilities: registrationCapabilities{
 			Scheduler:                 true,

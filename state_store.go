@@ -28,6 +28,7 @@ type PersistentState struct {
 	ProbeWindows        map[AuthInstanceID]map[ProbeWindowKind]ProbeWindow `json:"probe_windows,omitempty"`
 	LastConfirmedRoster *PersistedConfirmedRoster                          `json:"last_confirmed_roster,omitempty"`
 	ManagedLifecycle    map[string]ManagedDisableRecord                    `json:"managed_lifecycle,omitempty"`
+	QuotaProtection     map[string]QuotaProtectionRecord                   `json:"quota_protection,omitempty"`
 }
 
 type PersistedRosterEntry struct {
@@ -44,7 +45,7 @@ type PersistedConfirmedRoster struct {
 }
 
 func NewPersistentState() PersistentState {
-	return PersistentState{SchemaVersion: CurrentStateSchema, AdmissionEpochs: map[AuthInstanceID]InstanceAdmissionEpoch{}, CredentialChains: map[AuthInstanceID]TransitionChain{}, Bindings: map[string]RuntimeBinding{}, ProbeAttempts: map[AuthInstanceID]ProbeAttemptSeam{}, ProbeWindows: map[AuthInstanceID]map[ProbeWindowKind]ProbeWindow{}, ManagedLifecycle: map[string]ManagedDisableRecord{}}
+	return PersistentState{SchemaVersion: CurrentStateSchema, AdmissionEpochs: map[AuthInstanceID]InstanceAdmissionEpoch{}, CredentialChains: map[AuthInstanceID]TransitionChain{}, Bindings: map[string]RuntimeBinding{}, ProbeAttempts: map[AuthInstanceID]ProbeAttemptSeam{}, ProbeWindows: map[AuthInstanceID]map[ProbeWindowKind]ProbeWindow{}, ManagedLifecycle: map[string]ManagedDisableRecord{}, QuotaProtection: map[string]QuotaProtectionRecord{}}
 }
 func clonePersistentState(s PersistentState) PersistentState {
 	raw, _ := json.Marshal(s)
@@ -56,6 +57,9 @@ func clonePersistentState(s PersistentState) PersistentState {
 	}
 	if out.ManagedLifecycle == nil {
 		out.ManagedLifecycle = map[string]ManagedDisableRecord{}
+	}
+	if out.QuotaProtection == nil {
+		out.QuotaProtection = map[string]QuotaProtectionRecord{}
 	}
 	if out.CredentialChains == nil {
 		out.CredentialChains = map[AuthInstanceID]TransitionChain{}
