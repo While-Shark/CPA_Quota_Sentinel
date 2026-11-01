@@ -23,7 +23,8 @@ func resolveDefaultStatePath() string {
 	if err != nil || dir == "" {
 		dir = "."
 	}
-	return filepath.Join(dir, "CLIProxyAPI", PluginID, "state.json")
+	// 沿用旧目录，确保升级后仍能读取账号暂停记录和恢复所有权。
+	return filepath.Join(dir, "CLIProxyAPI", "codex-quota-scheduler", "state.json")
 }
 
 func LoadPluginDiskState(path string) (PluginDiskState, error) {

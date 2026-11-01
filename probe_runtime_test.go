@@ -1699,9 +1699,9 @@ func TestProbeLifecycleLogsNeverPersistArbitraryExternalCallbackText(t *testing.
 				t.Fatalf("%s injected callback error returned nil", stage)
 			}
 			for _, path := range []string{
-				"/v0/management/plugins/codex-quota-scheduler/status",
-				"/v0/management/plugins/codex-quota-scheduler/logs",
-				"/v0/management/plugins/codex-quota-scheduler/export",
+				"/v0/management/plugins/cpa-quota-sentinel/status",
+				"/v0/management/plugins/cpa-quota-sentinel/logs",
+				"/v0/management/plugins/cpa-quota-sentinel/export",
 			} {
 				resp := HandleManagementRequest(r.state, pluginapi.ManagementRequest{Method: http.MethodGet, Path: path, Headers: http.Header{"Authorization": []string{"Bearer management-key"}}, Query: url.Values{"format": []string{"json"}}}, now)
 				if resp.StatusCode != http.StatusOK {

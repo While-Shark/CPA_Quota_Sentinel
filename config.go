@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	PluginID = "codex-quota-scheduler"
+	PluginID = "cpa-quota-sentinel"
 
 	chatGPTQuotaEndpoint = "https://chatgpt.com/backend-api/wham/usage"
 
@@ -22,7 +22,7 @@ const (
 	FallbackFillFirst FallbackMode = "fill-first"
 )
 
-var pluginVersion = "0.4.3"
+var pluginVersion = "0.4.4"
 
 type MonthlyMode string
 

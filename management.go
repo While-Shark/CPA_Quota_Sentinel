@@ -232,7 +232,7 @@ func registerManagementWithConfig(cfg Config) pluginapi.ManagementRegistrationRe
 		Resources: []pluginapi.ResourceRoute{
 			{
 				Path:        configuredResourcePath(cfg) + "/status",
-				Menu:        "Codex Scheduler",
+				Menu:        "CPA Quota Sentinel",
 				Description: "Open scheduler quota status.",
 			},
 		},

@@ -85,7 +85,7 @@ func TestManagementPageDerivesAPIRootFromURL(t *testing.T) {
 	for _, want := range []string{
 		"function apiRootPrefix()",
 		"const ROOT_PREFIX=apiRootPrefix()",
-		"const MANAGEMENT_BASE=ROOT_PREFIX+'/v0/management/plugins/codex-quota-scheduler'",
+		"const MANAGEMENT_BASE=ROOT_PREFIX+'/v0/management/plugins/cpa-quota-sentinel'",
 		"url=ROOT_PREFIX+'/v0/management'+path",
 		"fetch(ROOT_PREFIX+'/v0/management'+path,init)",
 		"path.endsWith(suffix)",

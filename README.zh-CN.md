@@ -26,8 +26,10 @@
 1. 使用 Go 1.26 和 C 编译器构建本仓库。上游商店安装包不包含本仓库的新增功能。
 2. 停止 CPA，将对应系统和架构的动态库放进 CPA 插件目录，再启动 CPA。
 3. 在 CPA 配置中启用插件。
-4. 访问 `/v0/resource/plugins/codex-quota-scheduler/status`，填入 CPA 管理密钥。
+4. 访问 `/v0/resource/plugins/cpa-quota-sentinel/status`，填入 CPA 管理密钥。
 5. 在“调度设置”打开低额度保护，确认阈值后保存，再刷新账号额度并查看状态与日志。
+
+从 0.4.3 升级：先停止 CPA，移除旧插件文件并将 CPA 配置中 `codex-quota-scheduler` 的配置复制到 `cpa-quota-sentinel`，再安装新版本并启动。不要同时加载两个版本。插件沿用旧状态目录；旧的管理入口会变更。CPA 配置弹窗可能显示空白，留空仍使用默认路径，可手动填写该路径。
 
 自定义路径可在 CPA 插件配置弹窗设置，也可直接写入 CPA 的 `config.yaml`。
 字段直接放在插件配置下，不增加 `config:` 嵌套：
@@ -36,7 +38,7 @@
 plugins:
   enabled: true
   configs:
-    codex-quota-scheduler:
+    cpa-quota-sentinel:
       enabled: true
       priority: 1
       management_path: /my-private-quota
@@ -44,7 +46,7 @@ plugins:
 
 修改后使用：
 
-- 页面：`/v0/resource/plugins/codex-quota-scheduler/my-private-quota/status`
+- 页面：`/v0/resource/plugins/cpa-quota-sentinel/my-private-quota/status`
 - 鉴权 API：`/v0/management/my-private-quota/status?format=json`
 
 宿主重新注册路由后旧地址失效。自定义路径减少默认入口被发现的机会，仍需管理密钥、HTTPS 与宿主限流。
@@ -74,7 +76,7 @@ CPA 的插件配置弹窗不支持原生动作按钮，“打开后台”链接�
 
 ## 上游版本记录
 
-v0.4.3 更新插件展示名称，并在管理页加入后台路径快捷入口。
+v0.4.4 更新插件展示名称，并在管理页加入后台路径快捷入口。
 完整更新历史见 [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)。
 
 ## 调度逻辑
@@ -261,7 +263,7 @@ CPA 无法确认当前 Codex 账号列表和优先级时，普通刷新和新周
 
 CPA 插件商店通过读取 `registry.json` 索引源，并从对应 GitHub 仓库的 Releases 下载安装包。
 
-1. 在 GitHub 仓库推送 `v*` 版本标签（例如 `v0.4.3`），触发 GitHub Actions 自动编译各平台 `.zip` 包与 `checksums.txt` 并发布到 GitHub Releases。
+1. 在 GitHub 仓库推送 `v*` 版本标签（例如 `v0.4.4`），触发 GitHub Actions 自动编译各平台 `.zip` 包与 `checksums.txt` 并发布到 GitHub Releases。
 2. 在 CPA 的 `config.yaml` 中将本仓库的 `registry.json` 加入 `plugins.store-sources`：
 
 ```yaml
@@ -275,7 +277,7 @@ plugins:
 
 ### 方式二：手动安装 / 本地编译安装
 
-从 [最新 GitHub Release](https://github.com/While-Shark/CPA_Quota_Sentinel/releases/latest) 下载对应平台的压缩包（或直接使用本地编译生成的 `dist/codex-quota-scheduler.dll` / `.so` / `.dylib`）：
+从 [最新 GitHub Release](https://github.com/While-Shark/CPA_Quota_Sentinel/releases/latest) 下载对应平台的压缩包（或直接使用本地编译生成的 `dist/cpa-quota-sentinel.dll` / `.so` / `.dylib`）：
 
 ```text
 codex-quota-scheduler_<version>_<goos>_<goarch>.zip
@@ -302,7 +304,7 @@ cp codex-quota-scheduler.dylib /path/to/CLIProxyAPI/plugins/darwin/arm64/
 plugins:
   enabled: true
   configs:
-    codex-quota-scheduler:
+    cpa-quota-sentinel:
       enabled: true
       priority: 1 # CPA plugin registration/load priority
 ```
@@ -390,7 +392,7 @@ streaming:
 从 CPA Management Center 打开 **Codex Scheduler**，或者访问：
 
 ```text
-/v0/resource/plugins/codex-quota-scheduler/status
+/v0/resource/plugins/cpa-quota-sentinel/status
 ```
 
 页面提供：
@@ -473,11 +475,11 @@ make build
 构建发布压缩包和校验文件：
 
 ```bash
-make package VERSION=0.4.3
-make checksums VERSION=0.4.3
+make package VERSION=0.4.4
+make checksums VERSION=0.4.4
 ```
 
-Windows 用户可以用以下命令构建 `dist/codex-quota-scheduler.dll`：
+Windows 用户可以用以下命令构建 `dist/cpa-quota-sentinel.dll`：
 
 ```powershell
 .\build.ps1
@@ -492,8 +494,8 @@ Windows 用户可以用以下命令构建 `dist/codex-quota-scheduler.dll`：
 `config.go`、`Makefile` 和两份 README 中的版本字符串。
 
 ```bash
-git tag -a v0.4.3 -m "v0.4.3"
-git push origin v0.4.3
+git tag -a v0.4.4 -m "v0.4.4"
+git push origin v0.4.4
 ```
 
 发布包使用以下命名方式：
@@ -507,22 +509,22 @@ codex-quota-scheduler_<version>_<goos>_<goarch>.zip
 界面资源路由：
 
 ```text
-GET /v0/resource/plugins/codex-quota-scheduler/status
+GET /v0/resource/plugins/cpa-quota-sentinel/status
 ```
 
 受保护操作需要 CPA 管理密钥：
 
 ```text
-GET  /v0/management/plugins/codex-quota-scheduler/status?format=json
-GET  /v0/management/plugins/codex-quota-scheduler/logs
-GET  /v0/management/plugins/codex-quota-scheduler/export
-PUT  /v0/management/plugins/codex-quota-scheduler/settings
-POST /v0/management/plugins/codex-quota-scheduler/refresh
-POST /v0/management/plugins/codex-quota-scheduler/refresh/account
-POST /v0/management/plugins/codex-quota-scheduler/import
-PUT  /v0/management/plugins/codex-quota-scheduler/annotations
-PATCH /v0/management/plugins/codex-quota-scheduler/annotations/account
-PATCH /v0/management/plugins/codex-quota-scheduler/annotations/group
+GET  /v0/management/plugins/cpa-quota-sentinel/status?format=json
+GET  /v0/management/plugins/cpa-quota-sentinel/logs
+GET  /v0/management/plugins/cpa-quota-sentinel/export
+PUT  /v0/management/plugins/cpa-quota-sentinel/settings
+POST /v0/management/plugins/cpa-quota-sentinel/refresh
+POST /v0/management/plugins/cpa-quota-sentinel/refresh/account
+POST /v0/management/plugins/cpa-quota-sentinel/import
+PUT  /v0/management/plugins/cpa-quota-sentinel/annotations
+PATCH /v0/management/plugins/cpa-quota-sentinel/annotations/account
+PATCH /v0/management/plugins/cpa-quota-sentinel/annotations/group
 ```
 
 ## 许可证

@@ -286,11 +286,11 @@ code,.mono,.number{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation 
    adapted to the live v4 management API. API layer, authorization, polling,
    and save isolation semantics are carried over from the previous revision. */
 let STATUS={{json .}};
-const DEFAULT_MANAGEMENT_PATH='/plugins/codex-quota-scheduler';
+const DEFAULT_MANAGEMENT_PATH='/plugins/cpa-quota-sentinel';
 function managementPath(){const path=STATUS.management_path||(STATUS.settings||{}).management_path;return typeof path==='string'&&/^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(path)?path:DEFAULT_MANAGEMENT_PATH}
 function apiRootPrefix(){const current=managementPath();const resource=DEFAULT_MANAGEMENT_PATH+(current===DEFAULT_MANAGEMENT_PATH?'':current);const suffixes=['/v0/resource'+resource+'/status','/v0/management'+current+'/status','/v0/resource'+resource,'/v0/management'+current];const path=location.pathname;for(const suffix of suffixes){if(path.endsWith(suffix))return path.slice(0,-suffix.length)}const index=path.indexOf('/v0/');return index>0?path.slice(0,index):''}
 const ROOT_PREFIX=apiRootPrefix();
-const MANAGEMENT_BASE=ROOT_PREFIX+'/v0/management/plugins/codex-quota-scheduler';
+const MANAGEMENT_BASE=ROOT_PREFIX+'/v0/management/plugins/cpa-quota-sentinel';
 function managementBase(){return ROOT_PREFIX+'/v0/management'+managementPath()}
 function resourceStatusPath(){const current=managementPath();return ROOT_PREFIX+'/v0/resource'+DEFAULT_MANAGEMENT_PATH+(current===DEFAULT_MANAGEMENT_PATH?'':current)+'/status'}
 const LOCALE_STORAGE_KEY='codex-quota-scheduler-locale-v1';

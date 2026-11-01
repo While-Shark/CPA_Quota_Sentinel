@@ -6,6 +6,8 @@ English | [简体中文](README.zh-CN.md) | [Changelog](CHANGELOG.md)
 accounts from low quotas. It pauses affected accounts, verifies refreshed quota
 after resets, and resumes only accounts the plugin paused.
 
+Upgrade from 0.4.3: stop CPA, remove the old plugin binary, copy its CPA configuration from `codex-quota-scheduler` to `cpa-quota-sentinel`, install the new version, then restart. Do not load both versions. Existing state remains in its original directory. The management URL changes. CPA may show an empty path field; an empty value uses the default path.
+
 ## Quota Sentinel extension
 
 The CPA plugin ID and library filename remain `codex-quota-scheduler` for
@@ -28,7 +30,7 @@ The current code has local tests and a Windows DLL build verified; live CPA depl
 1. Build this repository with Go 1.26 and a C compiler (see Development below). The upstream store package does not include this extension.
 2. Stop CPA before replacing a loaded library. Copy the matching library to the CPA plugin directory for your OS and architecture.
 3. Enable `plugins.enabled` and `plugins.configs.codex-quota-scheduler.enabled` in CPA, then restart it.
-4. Open `/v0/resource/plugins/codex-quota-scheduler/status`, enter the CPA management key, enable protection in scheduling settings and save.
+4. Open `/v0/resource/plugins/cpa-quota-sentinel/status`, enter the CPA management key, enable protection in scheduling settings and save.
 5. Refresh account quotas from the page and check account status and logs.
 
 Optional custom path in CPA's `config.yaml` (fields belong directly to the plugin subtree):
@@ -37,7 +39,7 @@ Optional custom path in CPA's `config.yaml` (fields belong directly to the plugi
 plugins:
   enabled: true
   configs:
-    codex-quota-scheduler:
+    cpa-quota-sentinel:
       enabled: true
       priority: 1
       management_path: /my-private-quota
@@ -45,7 +47,7 @@ plugins:
 
 After changing the path in CPA's plugin configuration, use:
 
-- Page: `/v0/resource/plugins/codex-quota-scheduler/my-private-quota/status`
+- Page: `/v0/resource/plugins/cpa-quota-sentinel/my-private-quota/status`
 - Authenticated API: `/v0/management/my-private-quota/status?format=json`
 
 The old routes are rejected after the host re-registers routes. A custom path reduces predictable endpoint discovery;
@@ -78,7 +80,7 @@ Upstream release downloads contain upstream code, not this repository's changes.
 
 ## Upstream release history
 
-v0.4.3 displays the CPA_Quota_Sentinel name and adds a management path shortcut.
+v0.4.4 displays the CPA_Quota_Sentinel name and adds a management path shortcut.
 Full release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## How Scheduling Works
@@ -304,7 +306,7 @@ Keep this setting disabled unless you understand and accept that risk.
 
 CPA's Plugin Store reads plugin catalogs from `registry.json` sources and downloads release archives from GitHub Releases.
 
-1. Publish a GitHub Release tag (for example `v0.4.3`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
+1. Publish a GitHub Release tag (for example `v0.4.4`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
 2. Add this repository's `registry.json` to `plugins.store-sources` in CPA's `config.yaml`:
 
 ```yaml
@@ -319,7 +321,7 @@ plugins:
 ### Method 2: Manual / Local Installation
 
 Download the archive for your platform from the
-[latest GitHub release](https://github.com/While-Shark/CPA_Quota_Sentinel/releases/latest) (or use the locally compiled `dist/codex-quota-scheduler.dll` / `.so` / `.dylib`):
+[latest GitHub release](https://github.com/While-Shark/CPA_Quota_Sentinel/releases/latest) (or use the locally compiled `dist/cpa-quota-sentinel.dll` / `.so` / `.dylib`):
 
 ```text
 codex-quota-scheduler_<version>_<goos>_<goarch>.zip
@@ -347,7 +349,7 @@ Enable plugins globally and enable this plugin:
 plugins:
   enabled: true
   configs:
-    codex-quota-scheduler:
+    cpa-quota-sentinel:
       enabled: true
       priority: 1 # CPA plugin registration/load priority
 ```
@@ -454,7 +456,7 @@ and Chinese. The chain is disabled by default; enable it explicitly.
 Open **Codex Scheduler** from CPA Management Center, or visit:
 
 ```text
-/v0/resource/plugins/codex-quota-scheduler/status
+/v0/resource/plugins/cpa-quota-sentinel/status
 ```
 
 The page provides:
@@ -534,11 +536,11 @@ make build
 Build release archives and checksums:
 
 ```bash
-make package VERSION=0.4.3
-make checksums VERSION=0.4.3
+make package VERSION=0.4.4
+make checksums VERSION=0.4.4
 ```
 
-Windows users can build `dist/codex-quota-scheduler.dll` with:
+Windows users can build `dist/cpa-quota-sentinel.dll` with:
 
 ```powershell
 .\build.ps1
@@ -554,8 +556,8 @@ Before tagging, record the release in `CHANGELOG.md` and bump the version
 strings in `config.go`, `Makefile`, and both READMEs.
 
 ```bash
-git tag -a v0.4.3 -m "v0.4.3"
-git push origin v0.4.3
+git tag -a v0.4.4 -m "v0.4.4"
+git push origin v0.4.4
 ```
 
 Release archives use this naming scheme:
@@ -569,22 +571,22 @@ codex-quota-scheduler_<version>_<goos>_<goarch>.zip
 The UI resource is served from:
 
 ```text
-GET /v0/resource/plugins/codex-quota-scheduler/status
+GET /v0/resource/plugins/cpa-quota-sentinel/status
 ```
 
 Privileged operations require the CPA Management key:
 
 ```text
-GET  /v0/management/plugins/codex-quota-scheduler/status?format=json
-GET  /v0/management/plugins/codex-quota-scheduler/logs
-GET  /v0/management/plugins/codex-quota-scheduler/export
-PUT  /v0/management/plugins/codex-quota-scheduler/settings
-POST /v0/management/plugins/codex-quota-scheduler/refresh
-POST /v0/management/plugins/codex-quota-scheduler/refresh/account
-POST /v0/management/plugins/codex-quota-scheduler/import
-PUT  /v0/management/plugins/codex-quota-scheduler/annotations
-PATCH /v0/management/plugins/codex-quota-scheduler/annotations/account
-PATCH /v0/management/plugins/codex-quota-scheduler/annotations/group
+GET  /v0/management/plugins/cpa-quota-sentinel/status?format=json
+GET  /v0/management/plugins/cpa-quota-sentinel/logs
+GET  /v0/management/plugins/cpa-quota-sentinel/export
+PUT  /v0/management/plugins/cpa-quota-sentinel/settings
+POST /v0/management/plugins/cpa-quota-sentinel/refresh
+POST /v0/management/plugins/cpa-quota-sentinel/refresh/account
+POST /v0/management/plugins/cpa-quota-sentinel/import
+PUT  /v0/management/plugins/cpa-quota-sentinel/annotations
+PATCH /v0/management/plugins/cpa-quota-sentinel/annotations/account
+PATCH /v0/management/plugins/cpa-quota-sentinel/annotations/group
 ```
 
 ## Acknowledgments

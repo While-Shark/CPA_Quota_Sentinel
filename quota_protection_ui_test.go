@@ -93,14 +93,14 @@ function check(path,status,root,management,resource){
   if(resourceStatusPath()!==${JSON.stringify(resource)})throw Error('resource: '+resourceStatusPath());
  ` + "`" + `,context);
 }
-check('/proxy/v0/resource/plugins/codex-quota-scheduler/status',{},'/proxy',
- '/proxy/v0/management/plugins/codex-quota-scheduler','/proxy/v0/resource/plugins/codex-quota-scheduler/status');
-check('/proxy/v0/resource/plugins/codex-quota-scheduler/private/admin/status',{management_path:'/private/admin'},'/proxy',
- '/proxy/v0/management/private/admin','/proxy/v0/resource/plugins/codex-quota-scheduler/private/admin/status');
+check('/proxy/v0/resource/plugins/cpa-quota-sentinel/status',{},'/proxy',
+ '/proxy/v0/management/plugins/cpa-quota-sentinel','/proxy/v0/resource/plugins/cpa-quota-sentinel/status');
+check('/proxy/v0/resource/plugins/cpa-quota-sentinel/private/admin/status',{management_path:'/private/admin'},'/proxy',
+ '/proxy/v0/management/private/admin','/proxy/v0/resource/plugins/cpa-quota-sentinel/private/admin/status');
 check('/proxy/v0/management/private/admin/status',{settings:{management_path:'/private/admin'}},'/proxy',
- '/proxy/v0/management/private/admin','/proxy/v0/resource/plugins/codex-quota-scheduler/private/admin/status');
-check('/v0/resource/plugins/codex-quota-scheduler/status',{management_path:'//outside'},'',
- '/v0/management/plugins/codex-quota-scheduler','/v0/resource/plugins/codex-quota-scheduler/status');
+ '/proxy/v0/management/private/admin','/proxy/v0/resource/plugins/cpa-quota-sentinel/private/admin/status');
+check('/v0/resource/plugins/cpa-quota-sentinel/status',{management_path:'//outside'},'',
+ '/v0/management/plugins/cpa-quota-sentinel','/v0/resource/plugins/cpa-quota-sentinel/status');
 `
 	path := filepath.Join(t.TempDir(), "management-paths.cjs")
 	if err := os.WriteFile(path, []byte(script), 0o600); err != nil {

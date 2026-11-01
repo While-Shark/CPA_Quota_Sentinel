@@ -53,9 +53,9 @@ func TestCustomManagementRoutes(t *testing.T) {
 	}
 	store := NewPluginState(cfg)
 	for _, path := range []string{
-		"/v0/management/plugins/codex-quota-scheduler/settings",
-		"/v0/resource/plugins/codex-quota-scheduler/status",
-		"/v0/resource/plugins/codex-quota-scheduler/private/sentinel/settings",
+		"/v0/management/plugins/cpa-quota-sentinel/settings",
+		"/v0/resource/plugins/cpa-quota-sentinel/status",
+		"/v0/resource/plugins/cpa-quota-sentinel/private/sentinel/settings",
 		"/settings",
 	} {
 		response := HandleManagementRequest(store, pluginapi.ManagementRequest{Method: http.MethodGet, Path: path}, time.Now())

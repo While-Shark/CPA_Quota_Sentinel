@@ -62,7 +62,7 @@ func TestDumpSmokeFixtures(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "page.html"), page.Body, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	api := HandleManagementRequest(store, pluginapi.ManagementRequest{Method: http.MethodGet, Path: "/v0/management/plugins/codex-quota-scheduler/status", Query: url.Values{"format": []string{"json"}}}, now)
+	api := HandleManagementRequest(store, pluginapi.ManagementRequest{Method: http.MethodGet, Path: "/v0/management/plugins/cpa-quota-sentinel/status", Query: url.Values{"format": []string{"json"}}}, now)
 	if api.StatusCode != http.StatusOK {
 		t.Fatalf("api status = %d body=%s", api.StatusCode, api.Body)
 	}

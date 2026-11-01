@@ -14,7 +14,7 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_NAME: codex-quota-scheduler
+  PLUGIN_NAME: cpa-quota-sentinel
 
 jobs:
   test:
