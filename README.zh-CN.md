@@ -1,15 +1,13 @@
-# CPA 额度哨兵 · CPA Quota Sentinel
+# CPA_Quota_Sentinel
 
 简体中文 | [English](README.md) | [更新日志](CHANGELOG.zh-CN.md)
 
-`codex-quota-scheduler` 是 CLIProxyAPI（CPA）的动态库插件。它为 Codex
-账号提供额度感知的优化版 Fill First 调度，让 CPA 按账号的真实可用性选择账号，
-而不只是依赖固定的账号顺序。
+`CPA_Quota_Sentinel` 是 CLIProxyAPI（CPA）插件，用于保护 Codex OAuth 账号额度。
+额度偏低时暂停账号，重置后重新核实额度，仅自动恢复由插件暂停的账号。
 
 ## 本仓库新增功能
 
-本仓库为 While-Shark 二次开发版，基于上游提交
-`35fad07ec4d45e33875f34a37310bd2b3942704a`。为兼容 CPA，插件 ID 和动态库名仍为 `codex-quota-scheduler`。
+为兼容 CPA，插件 ID 和动态库名仍为 `codex-quota-scheduler`。
 
 - 5 小时与周/月窗口分别配置剩余额度暂停阈值，默认均为 20%。
 - 重置后重新查询额度，达到恢复阈值（默认 30%）才允许恢复。
@@ -76,7 +74,7 @@ CPA 的插件配置弹窗不支持原生动作按钮，“打开后台”链接�
 
 ## 上游版本记录
 
-v0.4.1 修复子路径部署与前置检查的版本解析问题。
+v0.4.2 更新 CPA_Quota_Sentinel 项目名称并加入插件商店索引。
 完整更新历史见 [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)。
 
 ## 调度逻辑
@@ -259,12 +257,25 @@ CPA 无法确认当前 Codex 账号列表和优先级时，普通刷新和新周
 
 ## 安装
 
-推荐使用 CPA 插件商店。找到 **Codex Quota Scheduler**，阅读第三方插件风险提示，
-然后安装最新稳定版本。
+### 方式一：通过 CPA 插件商店安装（自定义插件源）
 
-如需手动安装，请从
-[最新 GitHub Release](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases/latest)
-下载对应平台的压缩包：
+CPA 插件商店通过读取 `registry.json` 索引源，并从对应 GitHub 仓库的 Releases 下载安装包。
+
+1. 在 GitHub 仓库推送 `v*` 版本标签（例如 `v0.4.2`），触发 GitHub Actions 自动编译各平台 `.zip` 包与 `checksums.txt` 并发布到 GitHub Releases。
+2. 在 CPA 的 `config.yaml` 中将本仓库的 `registry.json` 加入 `plugins.store-sources`：
+
+```yaml
+plugins:
+  enabled: true
+  store-sources:
+    - "https://raw.githubusercontent.com/While-Shark/CPA_Quota_Sentinel/master/registry.json"
+```
+
+3. 打开 CPA 管理后台的插件商店，搜索 **CPA Quota Sentinel**（注意选择自定义源），点击安装即可。
+
+### 方式二：手动安装 / 本地编译安装
+
+从 [最新 GitHub Release](https://github.com/While-Shark/CPA_Quota_Sentinel/releases/latest) 下载对应平台的压缩包（或直接使用本地编译生成的 `dist/codex-quota-scheduler.dll` / `.so` / `.dylib`）：
 
 ```text
 codex-quota-scheduler_<version>_<goos>_<goarch>.zip
@@ -462,8 +473,8 @@ make build
 构建发布压缩包和校验文件：
 
 ```bash
-make package VERSION=0.4.1
-make checksums VERSION=0.4.1
+make package VERSION=0.4.2
+make checksums VERSION=0.4.2
 ```
 
 Windows 用户可以用以下命令构建 `dist/codex-quota-scheduler.dll`：
@@ -481,8 +492,8 @@ Windows 用户可以用以下命令构建 `dist/codex-quota-scheduler.dll`：
 `config.go`、`Makefile` 和两份 README 中的版本字符串。
 
 ```bash
-git tag -a v0.4.1 -m "v0.4.1"
-git push origin v0.4.1
+git tag -a v0.4.2 -m "v0.4.2"
+git push origin v0.4.2
 ```
 
 发布包使用以下命名方式：

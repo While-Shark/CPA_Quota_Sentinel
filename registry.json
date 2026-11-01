@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "plugins": [
+    {
+      "id": "codex-quota-scheduler",
+      "name": "CPA_Quota_Sentinel",
+      "description": "Quota-aware Codex OAuth scheduler with low-quota sentinel pause/recovery and custom management path.",
+      "author": "While-Shark",
+      "version": "0.4.2",
+      "repository": "https://github.com/While-Shark/CPA_Quota_Sentinel",
+      "logo": "https://raw.githubusercontent.com/router-for-me/CLIProxyAPI/main/docs/logo.png",
+      "homepage": "https://github.com/While-Shark/CPA_Quota_Sentinel",
+      "license": "MIT",
+      "tags": [
+        "codex",
+        "scheduler",
+        "quota",
+        "sentinel"
+      ]
+    }
+  ]
+}

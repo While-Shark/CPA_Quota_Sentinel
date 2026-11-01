@@ -1,17 +1,15 @@
-# CPA Quota Sentinel
+# CPA_Quota_Sentinel
 
 English | [简体中文](README.zh-CN.md) | [Changelog](CHANGELOG.md)
 
-`codex-quota-scheduler` is a dynamic library plugin for CLIProxyAPI (CPA). It
-provides a quota-aware, optimized Fill First scheduler for Codex accounts, so
-CPA selects accounts by real usability instead of relying on a static account
-order alone.
+`CPA_Quota_Sentinel` is a CLIProxyAPI (CPA) plugin that protects Codex OAuth
+accounts from low quotas. It pauses affected accounts, verifies refreshed quota
+after resets, and resumes only accounts the plugin paused.
 
 ## Quota Sentinel extension
 
-This repository is the While-Shark edition, based on upstream commit
-`35fad07ec4d45e33875f34a37310bd2b3942704a`. The plugin ID and library filename
-remain `codex-quota-scheduler` for compatibility.
+The CPA plugin ID and library filename remain `codex-quota-scheduler` for
+compatibility.
 
 - Separate remaining-quota pause thresholds for 5-hour and weekly/monthly windows (20% each).
 - Fresh quota verification after reset before recovery (30% remaining by default).
@@ -80,7 +78,7 @@ Upstream release downloads contain upstream code, not this repository's changes.
 
 ## Upstream release history
 
-v0.4.1 fixes subpath deployments and the preflight version parsing.
+v0.4.2 includes the CPA_Quota_Sentinel project identity and store registry.
 Full release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## How Scheduling Works
@@ -302,11 +300,26 @@ Keep this setting disabled unless you understand and accept that risk.
 
 ## Installation
 
-The recommended method is CPA's Plugin Store. Find **Codex Quota Scheduler**,
-review the third-party plugin warning, and install the latest stable release.
+### Method 1: Install via CPA Plugin Store (Custom Store Source)
 
-For manual installation, download the archive for your platform from the
-[latest GitHub release](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases/latest):
+CPA's Plugin Store reads plugin catalogs from `registry.json` sources and downloads release archives from GitHub Releases.
+
+1. Publish a GitHub Release tag (for example `v0.4.2`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
+2. Add this repository's `registry.json` to `plugins.store-sources` in CPA's `config.yaml`:
+
+```yaml
+plugins:
+  enabled: true
+  store-sources:
+    - "https://raw.githubusercontent.com/While-Shark/CPA_Quota_Sentinel/master/registry.json"
+```
+
+3. Open CPA's Plugin Store in the WebUI, search for **CPA Quota Sentinel** (source: `raw.githubusercontent.com`), and click **Install**.
+
+### Method 2: Manual / Local Installation
+
+Download the archive for your platform from the
+[latest GitHub release](https://github.com/While-Shark/CPA_Quota_Sentinel/releases/latest) (or use the locally compiled `dist/codex-quota-scheduler.dll` / `.so` / `.dylib`):
 
 ```text
 codex-quota-scheduler_<version>_<goos>_<goarch>.zip
@@ -521,8 +534,8 @@ make build
 Build release archives and checksums:
 
 ```bash
-make package VERSION=0.4.1
-make checksums VERSION=0.4.1
+make package VERSION=0.4.2
+make checksums VERSION=0.4.2
 ```
 
 Windows users can build `dist/codex-quota-scheduler.dll` with:
@@ -541,8 +554,8 @@ Before tagging, record the release in `CHANGELOG.md` and bump the version
 strings in `config.go`, `Makefile`, and both READMEs.
 
 ```bash
-git tag -a v0.4.1 -m "v0.4.1"
-git push origin v0.4.1
+git tag -a v0.4.2 -m "v0.4.2"
+git push origin v0.4.2
 ```
 
 Release archives use this naming scheme:

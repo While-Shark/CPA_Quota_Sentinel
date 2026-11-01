@@ -8,6 +8,12 @@ Earlier releases (v0.1.0 – v0.2.1) predate this file; see the
 [GitHub releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 page for them.
 
+## [v0.4.2] - 2026-11-01
+
+- Renamed the project presentation to `CPA_Quota_Sentinel` and added a custom
+  Plugin Store registry entry. Release tags build platform packages and publish
+  a GitHub Release automatically.
+
 ## [v0.4.1] - 2026-10-24
 
 - **Subpath deployments now work (#17).** The management page derives its API

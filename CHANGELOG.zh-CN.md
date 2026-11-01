@@ -8,6 +8,11 @@ v0.1.0 – v0.2.1 等更早版本早于本文件建立，请查看
 [GitHub Releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 页面。
 
+## [v0.4.2] - 2026-11-01
+
+- 项目展示名称统一为 `CPA_Quota_Sentinel`，并新增自定义插件商店索引。
+  推送版本标签后会自动构建各平台安装包并发布 GitHub Release。
+
 ## [v0.4.1] - 2026-10-24
 
 - **支持子路径部署（#17）。** 管理页不再硬编码域名根路径，而是从页面自身

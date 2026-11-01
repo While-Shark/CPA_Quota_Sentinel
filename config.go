@@ -22,7 +22,7 @@ const (
 	FallbackFillFirst FallbackMode = "fill-first"
 )
 
-var pluginVersion = "0.4.1"
+var pluginVersion = "0.4.2"
 
 type MonthlyMode string
 
@@ -645,8 +645,8 @@ func PluginRegistration() registration {
 		Metadata: pluginapi.Metadata{
 			Name:             PluginID,
 			Version:          pluginVersion,
-			Author:           "Jeffery",
-			GitHubRepository: "https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler",
+			Author:           "While-Shark",
+			GitHubRepository: "https://github.com/While-Shark/CPA_Quota_Sentinel",
 			Logo:             "https://raw.githubusercontent.com/router-for-me/CLIProxyAPI/main/docs/logo.png",
 			ConfigFields:     managementConfigFields(),
 		},
