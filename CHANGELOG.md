@@ -8,7 +8,7 @@ Earlier releases (v0.1.0 – v0.2.1) predate this file; see the
 [GitHub releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 page for them.
 
-## [Unreleased]
+## [v0.4.9] - 2026-11-02
 
 ### Added
 - Antigravity quota pool grouping by verified bucket IDs: Gemini, Claude/GPT, and Gemini 4 Argon are protected independently per requested model family.

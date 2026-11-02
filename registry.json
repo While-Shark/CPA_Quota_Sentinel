@@ -6,7 +6,7 @@
       "name": "CPA_Quota_Sentinel",
       "description": "Protect Codex OAuth quotas with automatic pause, verified recovery, and a custom management path.",
       "author": "While-Shark",
-      "version": "0.4.8",
+      "version": "0.4.9",
       "repository": "https://github.com/While-Shark/CPA_Quota_Sentinel",
       "logo": "https://raw.githubusercontent.com/router-for-me/CLIProxyAPI/main/docs/logo.png",
       "homepage": "https://github.com/While-Shark/CPA_Quota_Sentinel",

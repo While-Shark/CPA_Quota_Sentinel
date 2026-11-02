@@ -8,7 +8,7 @@ v0.1.0 – v0.2.1 等更早版本早于本文件建立，请查看
 [GitHub Releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 页面。
 
-## [未发布]
+## [v0.4.9] - 2026-11-02
 
 ### 新增
 - Antigravity 根据真实 bucketId 区分普通 Gemini、Claude/GPT 与 Gemini 4 Argon，按模型请求独立暂停、恢复和轮换；缺少 Argon 专属额度时显示未知，不伪造 0%。
