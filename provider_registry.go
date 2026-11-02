@@ -113,6 +113,7 @@ func (r *MultiProviderRegistry) SyncFromHostAuths(ctx context.Context, host Host
 		errMsg := ""
 		paused := false
 		var pauseWindows []ProviderQuotaWindow
+		var groupPauses map[string]ProviderGroupPause
 		lastProbed := time.Time{}
 
 		if exists {
@@ -123,6 +124,7 @@ func (r *MultiProviderRegistry) SyncFromHostAuths(ctx context.Context, host Host
 			errMsg = existing.Error
 			paused = existing.Paused
 			pauseWindows = existing.PauseWindows
+			groupPauses = existing.GroupPauses
 			lastProbed = existing.LastProbed
 		}
 		if file.Disabled {
@@ -138,6 +140,7 @@ func (r *MultiProviderRegistry) SyncFromHostAuths(ctx context.Context, host Host
 			Disabled:     file.Disabled,
 			Paused:       paused,
 			PauseWindows: pauseWindows,
+			GroupPauses:  groupPauses,
 			QuotaStatus:  quotaStatus,
 			Windows:      windows,
 			Error:        errMsg,
@@ -246,6 +249,9 @@ func (r *MultiProviderRegistry) ProbeAccount(ctx context.Context, host HostClien
 	if !ok {
 		return fmt.Errorf("account %s not found in registry", authID)
 	}
+	if account.Disabled {
+		return nil // 人工禁用的宿主账号不主动回源，不由插件恢复
+	}
 
 	if account.Provider == "codex" {
 		return nil // Codex 由已有刷新器调度管辖
@@ -259,6 +265,17 @@ func (r *MultiProviderRegistry) ProbeAccount(ctx context.Context, host HostClien
 		return err
 	}
 
+	if account.Provider == "xai" {
+		_, usingAPIKey := xaiAuthMetadata(authResp.JSON)
+		if usingAPIKey {
+			// API key 属于按量计费，不是 Grok Build OAuth 周额度。
+			account.QuotaStatus = "unknown"
+			account.Windows = nil
+			account.Error = ""
+			r.UpdateAccount(account)
+			return nil
+		}
+	}
 	token, projectID := ExtractAuthToken(authResp.JSON)
 	if token == "" {
 		errNoToken := fmt.Errorf("no access token found in auth credentials")
@@ -274,13 +291,26 @@ func (r *MultiProviderRegistry) ProbeAccount(ctx context.Context, host HostClien
 		windows, err = ProbeClaudeAccount(ctx, token, host.Do)
 	case "antigravity":
 		windows, err = ProbeAntigravityAccount(ctx, token, projectID, host.Do)
+	case "xai":
+		userID, _ := xaiAuthMetadata(authResp.JSON)
+		windows, err = ProbeXAIAccount(ctx, token, userID, host.Do)
 	default:
 		return fmt.Errorf("provider %s does not support quota probing", account.Provider)
 	}
 
 	if err != nil {
+		if account.Provider == "xai" && err == errXAIMissingQuota {
+			account.QuotaStatus = "unknown"
+			account.Windows = nil
+			account.Error = "Grok Build 未返回可量化的订阅额度"
+			r.UpdateAccount(account)
+			return nil
+		}
 		account.QuotaStatus = "error"
 		account.Error = sanitizeNetworkError(err)
+		if account.Provider == "xai" {
+			account.Error = safeXAIProbeError(err)
+		}
 		r.UpdateAccount(account)
 		return err
 	}
@@ -293,15 +323,28 @@ func (r *MultiProviderRegistry) ProbeAccount(ctx context.Context, host HostClien
 
 	cfg := globalState.Config()
 	if cfg.QuotaProtectionEnabled {
+		eligibleWindows := windows
+		if account.Provider == "antigravity" {
+			account.GroupPauses = advanceAntigravityGroupPauses(account.GroupPauses, windows, cfg, time.Now())
+			migrateLegacyAntigravityPause(&account, windows, cfg)
+			// AGY 分组保护不设整号 Paused，其他模型仍可使用独立额度。
+			eligibleWindows = quotaWindowsForGroup(windows, "")
+		}
 		if account.Paused {
 			// 使用首次触发暂停的窗口快照，后续轮询不能改写恢复证据。
-			if cfg.QuotaAutoRecover && providerRecoveryVerified(previousWindows, windows, cfg, time.Now()) {
+			// 升级前 AGY 使用整号暂停，旧快照没有模型分组标记；
+			// 对这些历史状态继续用全量新鲜额度进行恢复验证，避免永久无法恢复。
+			verifyWindows := eligibleWindows
+			if account.Provider == "antigravity" {
+				verifyWindows = windows
+			}
+			if cfg.QuotaAutoRecover && providerRecoveryVerified(previousWindows, verifyWindows, cfg, time.Now()) {
 				account.Paused = false
 				account.PauseWindows = nil
 			}
-		} else if providerNeedsProtectionPause(windows, cfg) {
+		} else if providerNeedsProtectionPause(eligibleWindows, cfg) {
 			account.Paused = true
-			account.PauseWindows = append([]ProviderQuotaWindow(nil), windows...)
+			account.PauseWindows = append([]ProviderQuotaWindow(nil), eligibleWindows...)
 		}
 	}
 
@@ -316,7 +359,7 @@ func (r *MultiProviderRegistry) ProbeAll(ctx context.Context, host HostClient) {
 	}
 	accounts := r.GetAll()
 	for _, acc := range accounts {
-		if acc.Provider == "claude" || acc.Provider == "antigravity" {
+		if acc.Provider == "claude" || acc.Provider == "antigravity" || acc.Provider == "xai" {
 			_ = r.ProbeAccount(ctx, host, acc.AuthID)
 		}
 	}

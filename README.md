@@ -10,7 +10,7 @@ Upgrade from 0.4.3: stop CPA, remove the old plugin binary, copy its CPA configu
 
 ## Multi-provider accounts
 
-The overview lists all upstream AUTH accounts. Codex uses its existing quota refresher; Claude and Antigravity use provider quota APIs. Other providers are shown with unknown quotas and remain eligible. Non-Codex accounts rotate within the highest available CPA priority. Protection uses the shared thresholds and never enables manually disabled accounts. Live provider credentials have not been tested in this release.
+The overview lists upstream AUTH accounts. Codex uses its existing refresher; Claude, Antigravity and xAI Grok Build OAuth use read-only upstream quota APIs. Antigravity has separate Gemini, Claude/GPT and Gemini 4 Argon quota pools, protected independently by requested model family. Missing Argon quota is unknown, not an assertion of model unavailability. xAI supports the upstream-reported weekly/monthly billing window only (no invented five-hour quota); API keys are not treated as OAuth subscriptions. Non-Codex accounts rotate within the highest available CPA priority. Live AGY/xAI integration still requires account-level testing.
 
 After changing `management_path` in CPA configuration, restart CPA to reload registered routes, then reopen the plugin sidebar entry. The CPA hash URL is a host page and does not change with the plugin resource path. Enter the CPA management key in the login card.
 
@@ -29,7 +29,7 @@ The CPA plugin ID and library filename are `cpa-quota-sentinel`.
 
 **Protection is opt-in:** turn on **Low quota protection** in the plugin's scheduling settings and save.
 The default pause thresholds are 20%, recovery is 30%, and protected-account checks run every 5 minutes.
-With protection enabled, Codex quotas are refreshed on the configured protection interval even without recent requests; Claude and Antigravity use that interval too. Confirmed roster, authentication, and retry-backoff safeguards still apply.
+With protection enabled, Codex quotas are refreshed on the configured protection interval even without recent requests; Claude, Antigravity and xAI OAuth use that interval too. Confirmed roster, authentication, and retry-backoff safeguards still apply.
 Release builds are produced by GitHub Actions with the required native toolchains. Live CPA deployment and quota-provider integration require installation and verification.
 
 ### Quick start

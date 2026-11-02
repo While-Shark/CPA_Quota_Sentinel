@@ -164,7 +164,8 @@ func ParseAntigravityQuota(body []byte) ([]ProviderQuotaWindow, error) {
 	var windows []ProviderQuotaWindow
 	for _, group := range payload.Groups {
 		for _, bucket := range group.Buckets {
-			if bucket.RemainingFraction == nil {
+			if bucket.RemainingFraction == nil ||
+				math.IsNaN(*bucket.RemainingFraction) || math.IsInf(*bucket.RemainingFraction, 0) {
 				continue
 			}
 			name := bucket.DisplayName
@@ -179,6 +180,8 @@ func ParseAntigravityQuota(body []byte) ([]ProviderQuotaWindow, error) {
 				Name:             name,
 				RemainingPercent: &rem,
 				ResetAt:          bucket.ResetTime,
+				BucketID:         bucket.BucketID,
+				Group:            antigravityBucketGroup(group.DisplayName, name, bucket.BucketID),
 			})
 		}
 	}

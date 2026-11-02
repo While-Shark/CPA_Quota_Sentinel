@@ -8,6 +8,17 @@ Earlier releases (v0.1.0 – v0.2.1) predate this file; see the
 [GitHub releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 page for them.
 
+## [Unreleased]
+
+### Added
+- Antigravity quota pool grouping by verified bucket IDs: Gemini, Claude/GPT, and Gemini 4 Argon are protected independently per requested model family.
+- Read-only Grok Build xAI OAuth billing credits probe for actual weekly/monthly periods. API keys and missing quota data stay unknown.
+- Provider cards now show quota group names, paused groups, and explicitly identify absent Argon quota data as unknown.
+
+### Fixed
+- Correctly recognize English five-hour bucket names and disambiguate duplicate weekly-limit labels.
+- Migrate provable legacy Antigravity global pauses to model groups without restoring manual disables or ambiguous quota states.
+
 ## [v0.4.8] - 2026-11-02
 
 ### Fixed

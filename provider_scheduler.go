@@ -25,20 +25,31 @@ func providerRecoveryVerified(previous, fresh []ProviderQuotaWindow, cfg Config,
 	if len(previous) == 0 || !providerMeetsRecoveryThreshold(fresh, cfg) {
 		return false
 	}
-	byName := make(map[string]ProviderQuotaWindow, len(fresh))
+	byID := make(map[string]ProviderQuotaWindow, len(fresh))
+	freshNames := make(map[string]int, len(fresh))
 	for _, window := range fresh {
-		byName[window.Name] = window
+		byID[providerQuotaIdentity(window)] = window
+		freshNames[window.Name]++
 	}
 	protected := false
 	for _, window := range previous {
-		current, ok := byName[window.Name]
-		if !ok || current.RemainingPercent == nil {
+		current, ok := byID[providerQuotaIdentity(window)]
+		if !ok && window.Group == "" && window.BucketID == "" {
+			if freshNames[window.Name] == 0 {
+				return false
+			}
+			freshNames[window.Name]--
+			for _, candidate := range fresh {
+				if candidate.Name == window.Name && candidate.RemainingPercent != nil {
+					current, ok = candidate, true
+					break
+				}
+			}
+		}
+		if !ok || current.RemainingPercent == nil || window.RemainingPercent == nil {
 			return false
 		}
-		if window.RemainingPercent == nil {
-			return false
-		}
-		if *window.RemainingPercent > providerProtectionThreshold(window.Name, cfg) {
+		if *window.RemainingPercent > providerProtectionThresholdForWindow(window, cfg) {
 			continue
 		}
 		protected = true
@@ -53,9 +64,11 @@ func providerRecoveryVerified(previous, fresh []ProviderQuotaWindow, cfg Config,
 	return protected
 }
 
-func providerProtectionThreshold(name string, cfg Config) float64 {
-	nameLower := strings.ToLower(name)
-	if strings.Contains(nameLower, "5h") || strings.Contains(nameLower, "5小时") {
+func providerProtectionThresholdForWindow(window ProviderQuotaWindow, cfg Config) float64 {
+	nameLower := strings.ToLower(window.Name)
+	idLower := strings.ToLower(window.BucketID)
+	if strings.Contains(nameLower, "5h") || strings.Contains(nameLower, "5小时") ||
+		strings.Contains(nameLower, "five hour") || strings.HasSuffix(idLower, "-5h") {
 		return cfg.FiveHourRemainingThreshold
 	}
 	return cfg.LongWindowRemainingThreshold
@@ -71,11 +84,7 @@ func providerNeedsProtectionPause(windows []ProviderQuotaWindow, cfg Config) boo
 		if w.RemainingPercent == nil {
 			continue
 		}
-		threshold := cfg.LongWindowRemainingThreshold
-		nameLower := strings.ToLower(w.Name)
-		if strings.Contains(nameLower, "5h") || strings.Contains(nameLower, "5小时") {
-			threshold = cfg.FiveHourRemainingThreshold
-		}
+		threshold := providerProtectionThresholdForWindow(w, cfg)
 		if *w.RemainingPercent <= threshold {
 			return true
 		}
@@ -98,11 +107,7 @@ func providerMeetsRecoveryThreshold(windows []ProviderQuotaWindow, cfg Config) b
 		if *w.RemainingPercent < cfg.QuotaRecoveryThreshold {
 			return false
 		}
-		threshold := cfg.LongWindowRemainingThreshold
-		nameLower := strings.ToLower(w.Name)
-		if strings.Contains(nameLower, "5h") || strings.Contains(nameLower, "5小时") {
-			threshold = cfg.FiveHourRemainingThreshold
-		}
+		threshold := providerProtectionThresholdForWindow(w, cfg)
 		if *w.RemainingPercent <= threshold {
 			return false
 		}
@@ -135,6 +140,11 @@ func pickProviderAccount(req pluginapi.SchedulerPickRequest, now time.Time) Pick
 		if cfg.QuotaProtectionEnabled {
 			isPaused := exists && acc.Paused
 			needsPause := exists && providerNeedsProtectionPause(acc.Windows, cfg)
+			if exists && acc.Provider == "antigravity" {
+				// 按实际请求模型族检查 AGY 的独立配额桶。
+				// Gemini 4 Argon 耗尽不能停掉普通 Gemini 或 Claude/GPT。
+				needsPause = antigravityGroupBlocked(acc, req.Model, cfg)
+			}
 			if isPaused || needsPause {
 				continue
 			}

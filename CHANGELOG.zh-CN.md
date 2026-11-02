@@ -8,6 +8,17 @@ v0.1.0 – v0.2.1 等更早版本早于本文件建立，请查看
 [GitHub Releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 页面。
 
+## [未发布]
+
+### 新增
+- Antigravity 根据真实 bucketId 区分普通 Gemini、Claude/GPT 与 Gemini 4 Argon，按模型请求独立暂停、恢复和轮换；缺少 Argon 专属额度时显示未知，不伪造 0%。
+- Grok Build xAI OAuth 通过只读 billing credits 查询真实周/月额度；API Key、无配额响应保持未知，不伪造 Codex 5 小时窗口。
+- 上游 AUTH 账号卡片显示额度所属模型组、暂停组及缺少 Argon 专属桶的提示。
+
+### 修复
+- 正确区分上游英文 `Five Hour Limit Remaining`、重名 Weekly Limit 配额桶，避免错误使用周阈值或误恢复。
+- 对可证实归属的 AGY 旧版整号暂停进行分组迁移；无法证实者维持安全暂停，不自动启用人工禁用账号。
+
 ## [v0.4.8] - 2026-11-02
 
 ### 修复

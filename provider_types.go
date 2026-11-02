@@ -8,24 +8,32 @@ import (
 // ProviderQuotaWindow 描述单个账号的配额窗口（如 5 小时、7 天或特定模型配额）。
 type ProviderQuotaWindow struct {
 	Name             string   `json:"name"`
-	RemainingPercent *float64 `json:"remaining_percent"`  // 0.0 - 100.0，未知时为 nil
-	ResetAt          *string  `json:"reset_at,omitempty"` // ISO8601 时间戳字符串
+	RemainingPercent *float64 `json:"remaining_percent"`   // 0.0 - 100.0，未知时为 nil
+	ResetAt          *string  `json:"reset_at,omitempty"`  // ISO8601 时间戳字符串
+	BucketID         string   `json:"bucket_id,omitempty"` // 上游稳定额度桶 ID
+	Group            string   `json:"group,omitempty"`     // gemini / claude-gpt / gemini-argon
+}
+
+// ProviderGroupPause 保留首次触发保护的额度窗口，恢复必须验证对应重置。
+type ProviderGroupPause struct {
+	Windows []ProviderQuotaWindow `json:"windows"`
 }
 
 // ProviderAccount 统一描述来自任一 Provider 的 Auth 账号元数据与真实配额状态。
 type ProviderAccount struct {
-	AuthID       string                `json:"auth_id"`
-	AuthIndex    string                `json:"auth_index"`
-	Provider     string                `json:"provider"`
-	Type         string                `json:"type,omitempty"`
-	Priority     int                   `json:"priority"`
-	Disabled     bool                  `json:"disabled"`
-	Paused       bool                  `json:"paused"`                  // 额度保护或托管停用时为 true
-	PauseWindows []ProviderQuotaWindow `json:"pause_windows,omitempty"` // 首次触发保护时的窗口基线，不能被轮询覆盖
-	QuotaStatus  string                `json:"quota_status"`            // "metered", "unknown", "error", "disabled"
-	Windows      []ProviderQuotaWindow `json:"windows"`
-	Error        string                `json:"error,omitempty"`
-	LastProbed   time.Time             `json:"last_probed,omitempty"`
+	AuthID       string                        `json:"auth_id"`
+	AuthIndex    string                        `json:"auth_index"`
+	Provider     string                        `json:"provider"`
+	Type         string                        `json:"type,omitempty"`
+	Priority     int                           `json:"priority"`
+	Disabled     bool                          `json:"disabled"`
+	Paused       bool                          `json:"paused"`                  // 额度保护或托管停用时为 true
+	PauseWindows []ProviderQuotaWindow         `json:"pause_windows,omitempty"` // 首次触发保护时的窗口基线，不能被轮询覆盖
+	GroupPauses  map[string]ProviderGroupPause `json:"group_pauses,omitempty"`  // AGY 分组暂停，不阻塞其他模型
+	QuotaStatus  string                        `json:"quota_status"`            // "metered", "unknown", "error", "disabled"
+	Windows      []ProviderQuotaWindow         `json:"windows"`
+	Error        string                        `json:"error,omitempty"`
+	LastProbed   time.Time                     `json:"last_probed,omitempty"`
 }
 
 // SupportedProvider 描述插件集成的上游认证提供商。
@@ -39,6 +47,7 @@ var supportedProvidersList = []SupportedProvider{
 	{ID: "codex", DisplayName: "ChatGPT / Codex", QuotaMode: "windowed"},
 	{ID: "claude", DisplayName: "Anthropic Claude", QuotaMode: "windowed"},
 	{ID: "antigravity", DisplayName: "Google Antigravity", QuotaMode: "summary"},
+	{ID: "xai", DisplayName: "xAI Grok Build", QuotaMode: "windowed"},
 	{ID: "gemini", DisplayName: "Google Gemini", QuotaMode: "unknown"},
 	{ID: "openai", DisplayName: "OpenAI Platform", QuotaMode: "unknown"},
 }
@@ -56,6 +65,8 @@ func NormalizeProviderName(name string) string {
 	switch lower {
 	case "anthropic":
 		return "claude"
+	case "grok", "grok-build", "xai-cli":
+		return "xai"
 	case "google", "gemini-cli":
 		return "gemini"
 	default:

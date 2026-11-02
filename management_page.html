@@ -557,9 +557,24 @@ function accountCard(a){
  <div class="card-actions">${button('pin',ic('pin',13)+pinLabel,pinned?'btn-subtle':'',`data-id="${E(a.auth_id)}"`)}${button('refresh-account',ic('refresh',13)+tr('刷新额度','Refresh'),'',`data-id="${E(a.auth_id)}"`)}${button('edit',ic('edit',13)+tr('编辑','Edit'),'',`data-id="${E(a.auth_id)}"`)}</div>
 </article>`;
 }
+function providerGroupLabel(group){
+ const names={
+  'gemini': 'Gemini',
+  'claude-gpt': 'Claude/GPT',
+  'gemini-argon': 'Gemini 4 Argon'
+ };
+ return names[group]||group;
+}
+function providerQuotaLabel(w){
+ return (w.group?providerGroupLabel(w.group)+' · ':'')+String(w.name||'');
+}
+function providerPausedLabel(a){
+ const groups=Object.keys(a.group_pauses||{});
+ return groups.length?' · '+tr('分组暂停','Paused groups')+': '+groups.map(providerGroupLabel).join(', '):'';
+}
 function renderProviderAccounts(){
  const accounts=state.providerAccounts;
- return `<section class="panel" style="padding:20px;margin-top:20px"><div class="section-heading"><h2>${tr('上游 AUTH 账号','Upstream AUTH accounts')} (${accounts.length})</h2>${button('refresh-provider-accounts',tr('查询全部额度','Query all quotas'),'btn-sm')}</div><p>${tr('按提供商读取真实额度窗口；未提供额度数据的账号不会被当作耗尽。','Read actual provider quota windows. Accounts without quota data are never treated as exhausted.')}</p>${state.providerError?`<p role="alert">${E(state.providerError)}</p>`:''}<div class="accounts-grid">${accounts.map(a=>`<article class="panel" style="padding:16px"><strong>${E(a.auth_id)}</strong> ${pill(E(a.provider),'blue')}<p>${E(a.quota_status||'unknown')}${a.disabled?' · '+tr('已禁用','Disabled'):''}${a.paused?' · '+tr('保护暂停','Protection paused'):''}</p>${(a.windows||[]).map(w=>quotaMarkup({remaining_percent:w.remaining_percent,used_percent:w.remaining_percent==null?null:100-w.remaining_percent,reset_at:w.reset_at},E(w.name))).join('')||`<p>${tr('上游未提供额度','Upstream quota not provided')}</p>`}${a.error?`<p role="alert">${E(a.error)}</p>`:''}</article>`).join('')}</div></section>`;
+ return `<section class="panel" style="padding:20px;margin-top:20px"><div class="section-heading"><h2>${tr('上游 AUTH 账号','Upstream AUTH accounts')} (${accounts.length})</h2>${button('refresh-provider-accounts',tr('查询全部额度','Query all quotas'),'btn-sm')}</div><p>${tr('按模型组读取真实额度；AGY 的 Gemini / Claude-GPT / Argon 分别保护。xAI API Key 不等同于 Grok Build OAuth 周额度。','Read verified provider quota windows by model family. AGY groups are protected independently; xAI API keys have no OAuth subscription quota.')}</p>${state.providerError?`<p role="alert">${E(state.providerError)}</p>`:''}<div class="accounts-grid">${accounts.map(a=>`<article class="panel" style="padding:16px"><strong>${E(a.auth_id)}</strong> ${pill(E(a.provider),'blue')}<p>${E(a.quota_status||'unknown')}${a.disabled?' · '+tr('已禁用','Disabled'):''}${a.paused?' · '+tr('保护暂停','Protection paused'):''}${E(providerPausedLabel(a))}</p>${(a.windows||[]).map(w=>quotaMarkup({remaining_percent:w.remaining_percent,used_percent:w.remaining_percent==null?null:100-w.remaining_percent,reset_at:w.reset_at},E(providerQuotaLabel(w)))).join('')||`<p>${tr('上游未提供额度','Upstream quota not provided')}</p>`}${a.provider==='antigravity'&&!(a.windows||[]).some(w=>w.group==='gemini-argon')?`<p class="setting-help">${tr('上游未返回 Gemini 4 Argon 专属额度，不代表该模型不可用。','The upstream did not return an Argon quota; this does not imply the model is unavailable.')}</p>`:''}${a.error?`<p role="alert">${E(a.error)}</p>`:''}</article>`).join('')}</div></section>`;
 }
 function renderOverview(){
  const available=state.accounts.filter(a=>a.available&&!a.quota_protection_paused).length;
@@ -571,7 +586,7 @@ function renderOverview(){
   <div class="panel metric"><div class="metric-icon">${ic('calendar',21)}</div><div><div class="metric-label">Monthly ${tr('模式','mode')}</div><div class="metric-value">${state.monthlyMode==='priority'?tr('优先使用月度账号','Monthly first'):tr('按到期时间排序','Order by expiry')}</div><div class="metric-hint">${tr('月度账号额度使用策略','Monthly quota usage strategy')}</div></div></div>
   <div class="panel metric"><div class="metric-icon">${ic('clock',21)}</div><div><div class="metric-label">${tr('最近选择','Last selected')}</div><div class="metric-value mono">${E(state.lastSelected||tr('暂无','None'))}</div><div class="metric-hint">${tr('上一次实际选中的账号','Most recently used account')}</div></div></div>
  </section>
- <div class="section-heading"><h2>${tr('调度队列','Scheduling queue')} <span>(${state.accounts.length})</span></h2><span>${tr('当前可用','Available')} ${available} / ${state.accounts.length} · ${tr('按调度顺序显示','Ordered by scheduler priority')}</span></div>
+ <div class="section-heading"><h2>${tr('Codex 调度队列','Codex scheduling queue')} <span>(${state.accounts.length})</span></h2><span>${tr('当前可用','Available')} ${available} / ${state.accounts.length} · ${tr('按调度顺序显示','Ordered by scheduler priority')}</span></div>
  ${state.accounts.length?`<section class="accounts-grid">${state.accounts.map(accountCard).join('')}</section>`:`<div class="panel empty"><div class="empty-icon">${ic('users',24)}</div><h3>${E(empty.title||tr('暂无账号数据','No account data yet'))}</h3><p>${E(empty.message||tr('等待额度刷新后，这里会显示账号卡片。','Cards will appear after the next quota refresh.'))}</p></div>`}${renderProviderAccounts()}`;
 }
 /* ---- render: logs ---- */
