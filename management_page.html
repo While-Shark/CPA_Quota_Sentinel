@@ -164,6 +164,8 @@ code,.mono,.number{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation 
 .protection-slider-head output{font-weight:800;font-variant-numeric:tabular-nums;color:var(--primary)}
 .protection-range{display:block;width:100%;accent-color:var(--primary);cursor:pointer;margin:6px 0}
 .protection-slider-help{font-size:10.6px;color:var(--muted);line-height:1.6;margin:5px 0 0}
+.protection-threshold-warning{font-size:11px;line-height:1.6;color:var(--danger);margin:8px 0 0;font-weight:650}
+.protection-threshold-warning[hidden]{display:none}
 .protection-advanced{margin-top:10px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surface-subtle)}
 .protection-advanced summary{cursor:pointer;font-size:11px;font-weight:700;color:var(--ink)}
 .protection-advanced .setting-row{padding:10px 0;grid-template-columns:minmax(0,1fr) minmax(128px,36%)}
@@ -455,6 +457,14 @@ function retryFromAPI(api){api=api||{};const mode=!api.retry_enabled?'off':api.r
 function retryToPayload(draft,serverSettings){const payload=Object.assign({},serverSettings);payload.retry_enabled=draft.mode!=='off';payload.retry_shadow=draft.mode==='shadow';payload.retry_always=draft.mode==='global';payload.retry_strip_reasoning=draft.advanced.stripEncrypted!==false;payload.retry_max_attempts=Number.parseInt(draft.advanced.maxAttempts,10)||4;payload.retry_max_frames=Number.parseInt(draft.advanced.maxFrames,10)||4096;payload.retry_stall_timeout=String(draft.advanced.silenceTimeout).trim();payload.retry_hold_timeout=String(draft.advanced.waitTimeout).trim();payload.retry_chain_deadline=String(draft.advanced.totalTimeout).trim();payload.retry_max_bytes=String(draft.advanced.maxBytes).trim();payload.retry_chain=draft.chains.filter(c=>String(c.source||'').trim()).map(chain=>({model:String(chain.source).trim(),fallbacks:chain.targets.filter(target=>String(target.model||'').trim()).map(target=>({provider:String(target.provider||'').trim(),model:String(target.model).trim()}))}));return payload}
 function normalizeRetryRuntime(raw){raw=raw||{};state.retryRuntime={mode:raw.mode||'off',requests:raw.requests||0,retries:raw.retries||0,succeeded:raw.succeeded||0,failed:raw.failed||0,shadow_hits:raw.shadow_hits||0,events:Array.isArray(raw.events)?raw.events.slice().reverse():[]};}
 /* ---- validation ---- */
+function protectionThresholdWarning(draft){
+ if(!draft)return '';
+ const pause=Math.max(Number(draft.five_hour_remaining_threshold),Number(draft.long_window_remaining_threshold));
+ const recovery=Number(draft.quota_recovery_threshold);
+ if(!Number.isFinite(pause)||!Number.isFinite(recovery)||recovery>pause)return '';
+ return tr('恢复阈值 '+recovery+'% 必须高于暂停阈值 '+pause+'%。请降低暂停阈值或提高恢复阈值。',
+           'Recovery threshold '+recovery+'% must exceed the pause threshold '+pause+'%. Lower the pause threshold or raise the recovery threshold.');
+}
 function validateSettings(draft){
  for(const [key,type] of SETTING_MAP.map(item=>[item[0],item[2]])){
   const value=draft[key];
@@ -463,8 +473,8 @@ function validateSettings(draft){
   if(type==='percent'&&(value===''||value===null||!Number.isFinite(Number(value))||Number(value)<0||Number(value)>100))
    throw new Error(tr('百分比必须在 0 到 100 之间：','Percentage must be between 0 and 100: ')+key);
  }
- if(Number(draft.quota_recovery_threshold)<=Math.max(Number(draft.five_hour_remaining_threshold),Number(draft.long_window_remaining_threshold)))
-  throw new Error(tr('恢复阈值必须大于两个暂停阈值','Recovery threshold must exceed both pause thresholds'));
+ if(protectionThresholdWarning(draft))
+  throw new Error(protectionThresholdWarning(draft));
  if(!String(draft.failure_retry_sequence).split(',').every(x=>isDuration(x.trim())))
   throw new Error(tr('刷新失败重试间隔格式错误','Invalid refresh retry sequence'));
 }
@@ -636,7 +646,8 @@ function protectionSettingsGroup(group){
  const five=Number(draft.five_hour_remaining_threshold),long=Number(draft.long_window_remaining_threshold);
  const unified=five===long,shared=unified?five:Math.max(five,long);
  const recovery=Number(draft.quota_recovery_threshold);
- const interval=String(draft.quota_protection_interval||'5m');
+ const thresholdWarning=protectionThresholdWarning(draft);
+  const interval=String(draft.quota_protection_interval||'5m');
  const intervals=['1m','5m','10m','30m'];
  if(!intervals.includes(interval))intervals.push(interval);
  const intervalOptions=intervals.map(value=>`<option value="${E(value)}" ${interval===value?'selected':''}>${E(value==='1m'?tr('1 分钟','1 minute'):value==='5m'?tr('5 分钟','5 minutes'):value==='10m'?tr('10 分钟','10 minutes'):value==='30m'?tr('30 分钟','30 minutes'):value)}</option>`).join('');
@@ -655,14 +666,15 @@ function protectionSettingsGroup(group){
  </div>
  <div>
   <div class="protection-slider-head"><label for="protectionRecoverySlider">${tr('恢复额度阈值','Recovery quota threshold')}</label><output for="protectionRecoverySlider" data-protection-output="recovery">${E(recovery)}%</output></div>
-  <input class="protection-range" id="protectionRecoverySlider" type="range" min="${E(Math.min(100,Math.max(five,long)+1))}" max="100" step="1" data-setting="quota_recovery_threshold" value="${E(recovery)}">
+  <input class="protection-range" id="protectionRecoverySlider" type="range" min="1" max="100" step="1" data-setting="quota_recovery_threshold" aria-describedby="protectionThresholdWarning" value="${E(recovery)}">
   <p class="protection-slider-help">${tr('触发保护的窗口完成重置后，重新查询并确认相关额度均至少达到恢复阈值，才自动启用。','After protected windows reset, a fresh quota check must confirm recovery before an account is enabled.')}</p>
+  <p class="protection-threshold-warning" id="protectionThresholdWarning" role="alert" aria-live="polite" ${thresholdWarning?'':'hidden'}>${E(thresholdWarning)}</p>
  </div>
  </div>
  <div class="protection-interval"><label for="protectionIntervalSelect">${tr('额度检查间隔','Quota check interval')}<span class="setting-help" style="display:block;font-weight:400">${tr('后台定期检查 OAuth 账号额度','Periodically check OAuth account quotas')}</span></label>
   <select class="select" id="protectionIntervalSelect" data-setting="quota_protection_interval">${intervalOptions}</select></div>
  ${settingRow(group.items[5])}
- <div class="protection-actions"><span class="setting-help">${tr('仅自动恢复此插件暂停并持有所有权的账号，不会启用人工停用账号。','Only accounts paused and owned by this plugin can be automatically restored.')}</span><div class="toolbar-actions">${button('copy-protection-policy',ic('copy',14)+tr('复制策略 JSON','Copy policy JSON'),'btn-sm')}${button('save-settings',ic('check',14)+tr('保存并生效','Save and apply'),'btn-primary btn-sm')}</div></div>
+ <div class="protection-actions"><span class="setting-help">${tr('仅自动恢复此插件暂停并持有所有权的账号，不会启用人工停用账号。','Only accounts paused and owned by this plugin can be automatically restored.')}</span><div class="toolbar-actions">${button('copy-protection-policy',ic('copy',14)+tr('复制策略 JSON','Copy policy JSON'),'btn-sm')}${button('save-settings',ic('check',14)+tr('保存并生效','Save and apply'),'btn-primary btn-sm',thresholdWarning?'disabled aria-disabled="true"':'')}</div></div>
  </section>`;
 }
 function settingsGroup(group){
@@ -677,7 +689,7 @@ function renderSettings(){
  <div class="banner blue settings-note">${ic('info',18)}<div><strong>${tr('当前后台路径','Current management path')}</strong><div class="management-entry-row"><code>${E(managementPath())}</code><a class="btn btn-sm" href="${E(resourceStatusPath())}" target="_blank" rel="noopener noreferrer">${tr('打开后台','Open management')}</a></div><p>${tr('未自定义时使用默认路径；可在 CPA 的插件配置中修改。后台仍需要 CPA 管理密钥。','The default path is used unless customized in CPA plugin configuration. The admin key remains required.')}</p></div></div>
  ${state.loaded&&!state.settingsDraft.activate_new_reset?`<div class="banner">${ic('alert',18)}<div><strong>${tr('自动激活新的额度周期：当前已关闭','Automatic activation of new quota windows is off')}</strong><p>${tr('额度重置后只进行只读检查，不会主动发起激活请求；打开可能消耗少量额度。','After quota reset, the scheduler only performs read-only checks; activation can consume quota.')}</p></div></div>`:''}
  <div class="settings-grid">${columns.map(column=>`<div class="settings-col">${column.map(settingsGroup).join('')}</div>`).join('')}</div>
- <div class="settings-savebar"><div class="dirty-label">${state.settingsDirty?`<strong>● ${tr('有未保存的设置修改','Unsaved scheduling changes')}</strong>`:tr('当前设置已保存','Scheduling settings are saved')} · ${tr('与重试链设置独立保存','Saved independently from retry settings')}</div><div class="toolbar-actions">${button('export-settings',ic('download',14)+tr('导出配置','Export settings'))}${button('import-settings',ic('upload',14)+tr('导入配置','Import settings'))}${button('save-settings',ic('check',14)+tr('保存设置','Save settings'),'btn-primary')}</div></div>`;
+ <div class="settings-savebar"><div class="dirty-label">${state.settingsDirty?`<strong>● ${tr('有未保存的设置修改','Unsaved scheduling changes')}</strong>`:tr('当前设置已保存','Scheduling settings are saved')} · ${tr('与重试链设置独立保存','Saved independently from retry settings')}</div><div class="toolbar-actions">${button('export-settings',ic('download',14)+tr('导出配置','Export settings'))}${button('import-settings',ic('upload',14)+tr('导入配置','Import settings'))}${button('save-settings',ic('check',14)+tr('保存设置','Save settings'),'btn-primary',protectionThresholdWarning(state.settingsDraft)?'disabled aria-disabled="true"':'')}</div></div>`;
 }
 /* ---- render: retry ---- */
 function chainMarkup(chain,index){
@@ -822,13 +834,8 @@ document.addEventListener('input',(ev)=>{
   if(!Number.isFinite(pause))return;
   state.settingsDraft.five_hour_remaining_threshold=pause;
   state.settingsDraft.long_window_remaining_threshold=pause;
-  if(Number(state.settingsDraft.quota_recovery_threshold)<=pause)state.settingsDraft.quota_recovery_threshold=Math.min(100,pause+5);
   const pauseOutput=document.querySelector('[data-protection-output="pause"]');
-  const recoveryOutput=document.querySelector('[data-protection-output="recovery"]');
-  const recoverySlider=document.getElementById('protectionRecoverySlider');
   if(pauseOutput)pauseOutput.textContent=pause+'%';
-  if(recoveryOutput)recoveryOutput.textContent=state.settingsDraft.quota_recovery_threshold+'%';
-  if(recoverySlider){recoverySlider.min=String(pause+1);recoverySlider.value=String(state.settingsDraft.quota_recovery_threshold)}
   state.settingsDirty=true;syncSavebarDirty();return;
  }
  if(d.setting&&el.type!=='checkbox'&&el.type!=='radio'){
@@ -859,7 +866,26 @@ document.getElementById('importFile').addEventListener('change',async(ev)=>{
  const file=ev.target.files&&ev.target.files[0];if(!file)return;
  try{const text=await file.text();await requestManagement('/import',{method:'POST',contentType:'application/json',body:text});state.settingsDirty=false;await refreshSnapshot();renderKeepScroll();toast(tr('配置已导入，请确认后再次保存','Configuration imported; review and save'))}catch(error){toast(error.message||String(error),'error')}finally{ev.target.value=''}
 });
-function syncSavebarDirty(){const el=document.querySelector('.settings-savebar .dirty-label');if(!el)return;if(state.route==='settings')el.innerHTML=state.settingsDirty?`<strong>● ${tr('有未保存的设置修改','Unsaved scheduling changes')}</strong> · ${tr('与重试链设置独立保存','Saved independently from retry settings')}`:el.innerHTML;if(state.route==='retry')el.innerHTML=state.retryDirty?`<strong>● ${tr('有未保存的重试链修改','Unsaved retry changes')}</strong> · ${tr('与调度设置独立保存','Saved separately from scheduling settings')}`:el.innerHTML}
+function syncSavebarDirty(){
+ const el=document.querySelector('.settings-savebar .dirty-label');
+ if(el&&state.route==='settings'&&state.settingsDirty){
+  el.innerHTML=`<strong>● ${tr('有未保存的设置修改','Unsaved scheduling changes')}</strong> · ${tr('与重试链设置独立保存','Saved independently from retry settings')}`;
+ }
+ if(el&&state.route==='retry'&&state.retryDirty){
+  el.innerHTML=`<strong>● ${tr('有未保存的重试链修改','Unsaved retry changes')}</strong> · ${tr('与调度设置独立保存','Saved separately from scheduling settings')}`;
+ }
+ if(state.route!=='settings')return;
+ const warning=protectionThresholdWarning(state.settingsDraft);
+ const note=document.getElementById('protectionThresholdWarning');
+ if(note){note.textContent=warning;note.hidden=!warning;}
+ const slider=document.getElementById('protectionRecoverySlider');
+ if(slider)slider.setAttribute('aria-invalid',String(!!warning));
+ document.querySelectorAll('[data-action="save-settings"]').forEach(save=>{
+  save.disabled=!!warning;
+  save.setAttribute('aria-disabled',String(!!warning));
+  if(warning)save.title=warning;else save.removeAttribute('title');
+ });
+}
 window.addEventListener('hashchange',()=>{if(!['overview','logs','settings','retry'].includes(location.hash.slice(1)))history.replaceState(null,'','#overview');render();window.scrollTo({top:0,behavior:'instant'})});
 if(!['overview','logs','settings','retry'].includes(location.hash.slice(1)))history.replaceState(null,'','#overview');
 state.lang=detectLocale();

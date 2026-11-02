@@ -313,7 +313,7 @@ Keep this setting disabled unless you understand and accept that risk.
 
 CPA's Plugin Store reads plugin catalogs from `registry.json` sources and downloads release archives from GitHub Releases.
 
-1. Publish a GitHub Release tag (for example `v0.4.7`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
+1. Publish a GitHub Release tag (for example `v0.4.8`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
 2. Add this repository's `registry.json` to `plugins.store-sources` in CPA's `config.yaml`:
 
 ```yaml
@@ -543,8 +543,8 @@ make build
 Build release archives and checksums:
 
 ```bash
-make package VERSION=0.4.7
-make checksums VERSION=0.4.7
+make package VERSION=0.4.8
+make checksums VERSION=0.4.8
 ```
 
 Windows users can build `dist/cpa-quota-sentinel.dll` with:
@@ -563,8 +563,8 @@ Before tagging, record the release in `CHANGELOG.md` and bump the version
 strings in `config.go`, `Makefile`, and both READMEs.
 
 ```bash
-git tag -a v0.4.7 -m "v0.4.7"
-git push origin v0.4.7
+git tag -a v0.4.8 -m "v0.4.8"
+git push origin v0.4.8
 ```
 
 Release archives use this naming scheme:

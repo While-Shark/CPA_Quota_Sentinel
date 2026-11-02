@@ -8,6 +8,12 @@ Earlier releases (v0.1.0 – v0.2.1) predate this file; see the
 [GitHub releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 page for them.
 
+## [v0.4.8] - 2026-11-02
+
+### Fixed
+- The recovery-quota slider now supports its full 1–100% range, regardless of the pause threshold.
+- Show an immediate bilingual warning and disable saving when recovery is not above both pause thresholds. Do not silently change the recovery value when adjusting pause thresholds.
+
 ## [v0.4.7] - 2026-11-02
 
 ### Added

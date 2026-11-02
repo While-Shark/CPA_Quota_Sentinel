@@ -33,7 +33,7 @@ const isDuration=value=>/^\d+(\.\d+)?[smhd]$/.test(value);
 let state={settingsDraft:{quota_protection_enabled:true,five_hour_remaining_threshold:20,
 quota_protection_interval:'5m',long_window_remaining_threshold:20,quota_recovery_threshold:30,quota_auto_recover:true}};
 const ic=()=>'';
-const button=(action)=>'<button data-action="'+action+'"></button>';
+const button=(action,label,style,extra='')=>'<button data-action="'+action+'" '+extra+'></button>';
 const renderHeader=()=>'';
 const rosterWarning=()=>'';
 ` + statusTemplateSource[start:end] + `
@@ -57,9 +57,21 @@ for(const value of [-1,101,NaN,Infinity]){
 }
 assert.throws(()=>validateSettings({...draft,quota_recovery_threshold:15}));
 validateSettings({...draft,five_hour_remaining_threshold:0,long_window_remaining_threshold:99,quota_recovery_threshold:100});
+validateSettings({...draft,five_hour_remaining_threshold:0,long_window_remaining_threshold:0,quota_recovery_threshold:1});
 const policy=protectionSettingsGroup(SETTING_GROUPS.find(group=>group.id==='quota_protection'));
 assert.match(policy,/id="protectionPauseSlider" type="range"/);
-assert.match(policy,/id="protectionRecoverySlider" type="range"/);
+assert.match(policy,/id="protectionRecoverySlider" type="range" min="1" max="100"/);
+assert.match(policy,/id="protectionThresholdWarning" role="alert" aria-live="polite" hidden/);
+assert.equal(protectionThresholdWarning(state.settingsDraft),'');
+state.settingsDraft={...draft,five_hour_remaining_threshold:40,long_window_remaining_threshold:40,quota_recovery_threshold:1};
+const invalidPolicy=protectionSettingsGroup(SETTING_GROUPS.find(group=>group.id==='quota_protection'));
+assert.match(invalidPolicy,/id="protectionRecoverySlider" type="range" min="1" max="100"/);
+assert.match(invalidPolicy,/恢复阈值 1% 必须高于暂停阈值 40%/);
+assert.match(invalidPolicy,/data-action="save-settings" disabled aria-disabled="true"/);
+assert.throws(()=>validateSettings(state.settingsDraft),/恢复阈值 1% 必须高于暂停阈值 40%/);
+state.settingsDraft.quota_recovery_threshold=41;
+assert.equal(protectionThresholdWarning(state.settingsDraft),'');
+assert.doesNotThrow(()=>validateSettings(state.settingsDraft));
 assert.match(policy,/id="protectionIntervalSelect"/);
 assert.match(policy,/data-protection-advanced/);
 assert.match(policy,/data-action="copy-protection-policy"/);
