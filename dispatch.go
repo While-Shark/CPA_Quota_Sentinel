@@ -386,6 +386,17 @@ func startGlobalRefresher() {
 	startProviderBackgroundRunner()
 }
 
+// wakeConfiguredRefreshers 只重排后台检查期限，不主动调用模型，也不重启插件。
+func wakeConfiguredRefreshers() {
+	refresherMu.Lock()
+	refresher := globalRefresher
+	refresherMu.Unlock()
+	if refresher != nil {
+		refresher.wakeRefreshLoop()
+	}
+	wakeProviderBackgroundRunner()
+}
+
 func refreshGlobalRefresherSoon() {
 	refresherMu.Lock()
 	refresher := globalRefresher

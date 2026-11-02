@@ -237,6 +237,8 @@ type QuotaRefresher struct {
 	wake                   chan struct{}
 	pendingDue             func() error
 	pendingDueVersion      uint64
+	nextProtectionPollAt   time.Time
+	protectionPollInterval time.Duration
 	wg                     sync.WaitGroup
 	coordinator            *Coordinator
 	legacyTxn              *LegacyRefreshTxn
@@ -985,7 +987,7 @@ func (r *QuotaRefresher) refreshDueOnce(version uint64) error {
 		return nil
 	}
 	now := r.now()
-	if !r.state.RefreshActive(now) {
+	if !r.state.RefreshActive(now) && !r.state.Config().QuotaProtectionEnabled {
 		return nil
 	}
 	dueAccounts := r.state.DueAccounts(now)
@@ -1391,6 +1393,7 @@ func (r *QuotaRefresher) Start() {
 			}
 			select {
 			case <-timerC:
+				r.advanceProtectionPollDeadline(r.now())
 				_ = r.lifecycleRefresher().RecoverQuotaProtectionAccounts(context.Background())
 				// Managed-quota recovery runs before normal deadlines so
 				// disabled accounts return as soon as their quota recovers,
@@ -1628,7 +1631,12 @@ func (r *QuotaRefresher) nextRefreshLoopDelay() (time.Duration, bool) {
 	if managed := r.managedRecoveryDeadline(now); !managed.IsZero() && (deadline.IsZero() || managed.Before(deadline)) {
 		deadline = managed
 	}
-	if protected := r.quotaProtectionDeadline(now); !protected.IsZero() && (deadline.IsZero() || protected.Before(deadline)) { deadline = protected }
+	if protected := r.quotaProtectionDeadline(now); !protected.IsZero() && (deadline.IsZero() || protected.Before(deadline)) {
+		deadline = protected
+	}
+	if poll := r.protectionPollDeadline(now); !poll.IsZero() && (deadline.IsZero() || poll.Before(deadline)) {
+		deadline = poll
+	}
 	if deadline.IsZero() {
 		return 0, false
 	}

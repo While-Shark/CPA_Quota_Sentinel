@@ -24,12 +24,13 @@ The CPA plugin ID and library filename are `cpa-quota-sentinel`.
 - Accounts without a 5-hour window are supported. Previously observed windows cannot silently disappear during recovery.
 - Persistent pause evidence, credential fingerprints and ownership markers for managed auth disabling.
 - Custom management paths, account protection status, logs and policy JSON export.
+- A live scheduling-settings policy panel with a shared pause-threshold slider, optional per-window thresholds, recovery slider, polling presets, automatic recovery switch and save/apply action.
 - English and Simplified Chinese documentation and management UI.
 
 **Protection is opt-in:** turn on **Low quota protection** in the plugin's scheduling settings and save.
 The default pause thresholds are 20%, recovery is 30%, and protected-account checks run every 5 minutes.
-Normal active-account polling remains 30 minutes; the 5-minute interval concerns paused-account recovery checks.
-The current code has local tests and a Windows DLL build verified; live CPA deployment has not been accepted yet.
+With protection enabled, Codex quotas are refreshed on the configured protection interval even without recent requests; Claude and Antigravity use that interval too. Confirmed roster, authentication, and retry-backoff safeguards still apply.
+Release builds are produced by GitHub Actions with the required native toolchains. Live CPA deployment and quota-provider integration require installation and verification.
 
 ### Quick start
 
@@ -70,7 +71,7 @@ An **Open management** link is provided inside the plugin settings page.
 | `five_hour_remaining_threshold` | `20` | Pause when known 5-hour remaining percentage is at or below this value. |
 | `long_window_remaining_threshold` | `20` | Pause when known weekly/monthly remaining percentage is at or below this value. |
 | `quota_recovery_threshold` | `30` | Fresh evidence must meet this value and exceed both pause thresholds. |
-| `quota_protection_interval` | `5m` | Recheck interval for protected accounts. |
+| `quota_protection_interval` | `5m` | Background quota-check cadence while protection is enabled, including recovery checks. |
 | `quota_auto_recover` | `true` | Restore only accounts with matching plugin ownership. |
 
 Saved page settings persist and take precedence over startup YAML for scheduling options;
@@ -312,7 +313,7 @@ Keep this setting disabled unless you understand and accept that risk.
 
 CPA's Plugin Store reads plugin catalogs from `registry.json` sources and downloads release archives from GitHub Releases.
 
-1. Publish a GitHub Release tag (for example `v0.4.6`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
+1. Publish a GitHub Release tag (for example `v0.4.7`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
 2. Add this repository's `registry.json` to `plugins.store-sources` in CPA's `config.yaml`:
 
 ```yaml
@@ -542,8 +543,8 @@ make build
 Build release archives and checksums:
 
 ```bash
-make package VERSION=0.4.6
-make checksums VERSION=0.4.6
+make package VERSION=0.4.7
+make checksums VERSION=0.4.7
 ```
 
 Windows users can build `dist/cpa-quota-sentinel.dll` with:
@@ -562,8 +563,8 @@ Before tagging, record the release in `CHANGELOG.md` and bump the version
 strings in `config.go`, `Makefile`, and both READMEs.
 
 ```bash
-git tag -a v0.4.6 -m "v0.4.6"
-git push origin v0.4.6
+git tag -a v0.4.7 -m "v0.4.7"
+git push origin v0.4.7
 ```
 
 Release archives use this naming scheme:

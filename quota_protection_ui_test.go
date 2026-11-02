@@ -33,7 +33,7 @@ const isDuration=value=>/^\d+(\.\d+)?[smhd]$/.test(value);
 let state={settingsDraft:{quota_protection_enabled:true,five_hour_remaining_threshold:20,
 quota_protection_interval:'5m',long_window_remaining_threshold:20,quota_recovery_threshold:30,quota_auto_recover:true}};
 const ic=()=>'';
-const button=()=>'';
+const button=(action)=>'<button data-action="'+action+'"></button>';
 const renderHeader=()=>'';
 const rosterWarning=()=>'';
 ` + statusTemplateSource[start:end] + `
@@ -55,7 +55,16 @@ assert.match(settingsControl(['quota_auto_recover','toggle']),/type="checkbox"/)
 for(const value of [-1,101,NaN,Infinity]){
  assert.throws(()=>validateSettings({...draft,five_hour_remaining_threshold:value}));
 }
-validateSettings({...draft,five_hour_remaining_threshold:0,long_window_remaining_threshold:100});
+assert.throws(()=>validateSettings({...draft,quota_recovery_threshold:15}));
+validateSettings({...draft,five_hour_remaining_threshold:0,long_window_remaining_threshold:99,quota_recovery_threshold:100});
+const policy=protectionSettingsGroup(SETTING_GROUPS.find(group=>group.id==='quota_protection'));
+assert.match(policy,/id="protectionPauseSlider" type="range"/);
+assert.match(policy,/id="protectionRecoverySlider" type="range"/);
+assert.match(policy,/id="protectionIntervalSelect"/);
+assert.match(policy,/data-protection-advanced/);
+assert.match(policy,/data-action="copy-protection-policy"/);
+assert.match(policy,/data-action="save-settings"/);
+assert.match(policy,/data-setting="quota_auto_recover"/);
 `
 	path := filepath.Join(t.TempDir(), "quota-protection-ui.cjs")
 	if err := os.WriteFile(path, []byte(script), 0o600); err != nil {

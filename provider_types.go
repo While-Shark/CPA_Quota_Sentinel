@@ -14,17 +14,18 @@ type ProviderQuotaWindow struct {
 
 // ProviderAccount 统一描述来自任一 Provider 的 Auth 账号元数据与真实配额状态。
 type ProviderAccount struct {
-	AuthID      string                `json:"auth_id"`
-	AuthIndex   string                `json:"auth_index"`
-	Provider    string                `json:"provider"`
-	Type        string                `json:"type,omitempty"`
-	Priority    int                   `json:"priority"`
-	Disabled    bool                  `json:"disabled"`
-	Paused      bool                  `json:"paused"`       // 额度保护或托管停用时为 true
-	QuotaStatus string                `json:"quota_status"` // "metered", "unknown", "error", "disabled"
-	Windows     []ProviderQuotaWindow `json:"windows"`
-	Error       string                `json:"error,omitempty"`
-	LastProbed  time.Time             `json:"last_probed,omitempty"`
+	AuthID       string                `json:"auth_id"`
+	AuthIndex    string                `json:"auth_index"`
+	Provider     string                `json:"provider"`
+	Type         string                `json:"type,omitempty"`
+	Priority     int                   `json:"priority"`
+	Disabled     bool                  `json:"disabled"`
+	Paused       bool                  `json:"paused"`                  // 额度保护或托管停用时为 true
+	PauseWindows []ProviderQuotaWindow `json:"pause_windows,omitempty"` // 首次触发保护时的窗口基线，不能被轮询覆盖
+	QuotaStatus  string                `json:"quota_status"`            // "metered", "unknown", "error", "disabled"
+	Windows      []ProviderQuotaWindow `json:"windows"`
+	Error        string                `json:"error,omitempty"`
+	LastProbed   time.Time             `json:"last_probed,omitempty"`
 }
 
 // SupportedProvider 描述插件集成的上游认证提供商。

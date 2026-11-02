@@ -8,6 +8,18 @@ Earlier releases (v0.1.0 – v0.2.1) predate this file; see the
 [GitHub releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 page for them.
 
+## [v0.4.7] - 2026-11-02
+
+### Added
+- Editable quota-protection policy panel: shared pause threshold, per-window advanced thresholds, recovery slider, check-interval presets, automatic recovery switch, copy JSON, and save/apply.
+- Dedicated protection polling deadline for Codex when idle, with protection checks following the configured interval even without recent model requests.
+- Background provider polling automatically adjusts when the check interval is changed in settings.
+
+### Fixed
+- Validate recovery threshold against both pause thresholds before saving in the management UI.
+- Align the UI default protection switch with the backend's safe opt-in default.
+- Preserve the original pause-window snapshot for Claude/Antigravity across polling and restarts; require reset evidence only for windows that triggered protection, while rejecting missing or unknown recovery evidence.
+
 ## [v0.4.6] - 2026-11-02
 
 - Add upstream AUTH inventory, real Claude and Antigravity quota probes, and rotation within the highest available CPA priority. Other providers remain visible with unknown quotas.

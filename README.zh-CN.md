@@ -21,12 +21,13 @@
 - 支持没有 5 小时窗口的账号；已知窗口在恢复时缺失不会被当作无限额度。
 - 持久化暂停记录、凭据指纹及插件所有权标记。
 - 自定义管理路径、暂停状态展示、日志及策略 JSON 导出。
+- 管理后台内置额度哨兵策略面板：统一暂停阈值滑块、可展开的 5 小时/周月独立阈值、恢复阈值滑块、检查间隔快捷选择、自动恢复开关及保存生效按钮。
 - 英文为默认 README，提供简体中文文档和中英文管理界面。
 
 **额度保护默认关闭，需在插件页面的“调度设置”中开启并保存。**
 暂停阈值默认 20%，恢复阈值默认 30%，保护中账号每 5 分钟复核。
-普通活跃账号轮询仍为 30 分钟，5 分钟并非所有账号的全局扫描周期。
-本地测试和 Windows DLL 构建已验证，尚未完成真实 CPA 部署验收。
+启用保护后，Codex 账号即使近期没有请求，也会按保护间隔刷新额度；Claude、Antigravity 同样使用该间隔。账号清单验证、认证退避等安全规则仍然生效。
+正式安装包由 GitHub Actions 使用对应平台编译器构建；真实 CPA 部署与额度提供商的集成仍需安装后验证。
 
 ### 快速使用
 
@@ -68,7 +69,7 @@ CPA 的插件配置弹窗不支持原生动作按钮，“打开后台”链接�
 | `five_hour_remaining_threshold` | `20` | 已知 5 小时窗口剩余百分比小于等于此值时暂停。 |
 | `long_window_remaining_threshold` | `20` | 已知周/月窗口剩余百分比小于等于此值时暂停。 |
 | `quota_recovery_threshold` | `30` | 恢复需达到此值，且必须大于两个暂停阈值。 |
-| `quota_protection_interval` | `5m` | 保护中账号的后台复核间隔。 |
+| `quota_protection_interval` | `5m` | 启用保护时的后台额度检查间隔，包含暂停账号恢复复核。 |
 | `quota_auto_recover` | `true` | 仅恢复插件拥有明确所有权的账号。 |
 
 页面已保存的调度设置优先于启动 YAML，`management_path` 始终由 CPA 插件配置控制。
@@ -270,7 +271,7 @@ CPA 无法确认当前 Codex 账号列表和优先级时，普通刷新和新周
 
 CPA 插件商店通过读取 `registry.json` 索引源，并从对应 GitHub 仓库的 Releases 下载安装包。
 
-1. 在 GitHub 仓库推送 `v*` 版本标签（例如 `v0.4.6`），触发 GitHub Actions 自动编译各平台 `.zip` 包与 `checksums.txt` 并发布到 GitHub Releases。
+1. 在 GitHub 仓库推送 `v*` 版本标签（例如 `v0.4.7`），触发 GitHub Actions 自动编译各平台 `.zip` 包与 `checksums.txt` 并发布到 GitHub Releases。
 2. 在 CPA 的 `config.yaml` 中将本仓库的 `registry.json` 加入 `plugins.store-sources`：
 
 ```yaml
@@ -482,8 +483,8 @@ make build
 构建发布压缩包和校验文件：
 
 ```bash
-make package VERSION=0.4.6
-make checksums VERSION=0.4.6
+make package VERSION=0.4.7
+make checksums VERSION=0.4.7
 ```
 
 Windows 用户可以用以下命令构建 `dist/cpa-quota-sentinel.dll`：
@@ -501,8 +502,8 @@ Windows 用户可以用以下命令构建 `dist/cpa-quota-sentinel.dll`：
 `config.go`、`Makefile` 和两份 README 中的版本字符串。
 
 ```bash
-git tag -a v0.4.6 -m "v0.4.6"
-git push origin v0.4.6
+git tag -a v0.4.7 -m "v0.4.7"
+git push origin v0.4.7
 ```
 
 发布包使用以下命名方式：

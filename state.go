@@ -830,7 +830,11 @@ func accountRefreshDue(account AccountState, cfg Config, now time.Time) (bool, s
 	if now.Sub(account.LastSuccessAt) > cfg.StaleAfter {
 		return true, "stale"
 	}
-	if !account.LastSuccessAt.Add(cfg.QuotaRefreshInterval).After(now) {
+	refreshInterval := cfg.QuotaRefreshInterval
+	if cfg.QuotaProtectionEnabled && cfg.QuotaProtectionInterval < refreshInterval {
+		refreshInterval = cfg.QuotaProtectionInterval
+	}
+	if !account.LastSuccessAt.Add(refreshInterval).After(now) {
 		return true, "refresh_interval_due"
 	}
 	if cfg.EnableResetProbe && resetProbeDueAny(account.ResetProbes, now) {

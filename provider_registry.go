@@ -112,6 +112,7 @@ func (r *MultiProviderRegistry) SyncFromHostAuths(ctx context.Context, host Host
 		var windows []ProviderQuotaWindow
 		errMsg := ""
 		paused := false
+		var pauseWindows []ProviderQuotaWindow
 		lastProbed := time.Time{}
 
 		if exists {
@@ -121,6 +122,7 @@ func (r *MultiProviderRegistry) SyncFromHostAuths(ctx context.Context, host Host
 			}
 			errMsg = existing.Error
 			paused = existing.Paused
+			pauseWindows = existing.PauseWindows
 			lastProbed = existing.LastProbed
 		}
 		if file.Disabled {
@@ -128,17 +130,18 @@ func (r *MultiProviderRegistry) SyncFromHostAuths(ctx context.Context, host Host
 		}
 
 		r.accounts[authID] = ProviderAccount{
-			AuthID:      authID,
-			AuthIndex:   file.AuthIndex,
-			Provider:    prov,
-			Type:        file.Type,
-			Priority:    file.Priority,
-			Disabled:    file.Disabled,
-			Paused:      paused,
-			QuotaStatus: quotaStatus,
-			Windows:     windows,
-			Error:       errMsg,
-			LastProbed:  lastProbed,
+			AuthID:       authID,
+			AuthIndex:    file.AuthIndex,
+			Provider:     prov,
+			Type:         file.Type,
+			Priority:     file.Priority,
+			Disabled:     file.Disabled,
+			Paused:       paused,
+			PauseWindows: pauseWindows,
+			QuotaStatus:  quotaStatus,
+			Windows:      windows,
+			Error:        errMsg,
+			LastProbed:   lastProbed,
 		}
 	}
 
@@ -282,7 +285,7 @@ func (r *MultiProviderRegistry) ProbeAccount(ctx context.Context, host HostClien
 		return err
 	}
 
-	previousWindows := account.Windows
+	previousWindows := account.PauseWindows
 	account.QuotaStatus = "metered"
 	account.Windows = windows
 	account.Error = ""
@@ -291,15 +294,14 @@ func (r *MultiProviderRegistry) ProbeAccount(ctx context.Context, host HostClien
 	cfg := globalState.Config()
 	if cfg.QuotaProtectionEnabled {
 		if account.Paused {
-			// 严格恢复验证：所有窗口必须达到恢复阈值
+			// 使用首次触发暂停的窗口快照，后续轮询不能改写恢复证据。
 			if cfg.QuotaAutoRecover && providerRecoveryVerified(previousWindows, windows, cfg, time.Now()) {
 				account.Paused = false
+				account.PauseWindows = nil
 			}
-		} else {
-			// 暂停判定：任一受保护窗口 <= 阈值立即暂停
-			if providerNeedsProtectionPause(windows, cfg) {
-				account.Paused = true
-			}
+		} else if providerNeedsProtectionPause(windows, cfg) {
+			account.Paused = true
+			account.PauseWindows = append([]ProviderQuotaWindow(nil), windows...)
 		}
 	}
 

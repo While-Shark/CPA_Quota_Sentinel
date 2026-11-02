@@ -662,6 +662,9 @@ func saveSettingsPayload(store *PluginState, payload SettingsPayload) pluginapi.
 		return jsonManagementResponse(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 	store.ReplaceConfig(cfg)
+	if store == globalState {
+		wakeConfiguredRefreshers()
+	}
 	currentConfig.Store(cfg)
 	if cfg.ProbeOnProvisionalRoster != previousRisk {
 		managementProvisionalRiskChanged(cfg.ProbeOnProvisionalRoster)
@@ -720,6 +723,9 @@ func handleImportState(store *PluginState, body []byte, now time.Time) pluginapi
 		return jsonManagementResponse(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 	store.ReplaceConfig(state.Config)
+	if store == globalState {
+		wakeConfiguredRefreshers()
+	}
 	currentConfig.Store(state.Config)
 	store.SetAnnotations(AnnotationState{Accounts: state.Accounts, Groups: state.Groups})
 	store.RecordLog("info", "ui.config_imported", "页面导入插件配置", nil, now)

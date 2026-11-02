@@ -21,8 +21,9 @@ func TestProviderPriorityAndRecovery(t *testing.T) {
 		t.Fatalf("wrong priority: %+v", decision)
 	}
 	remaining := 80.0
+	lowRemaining := 15.0
 	reset := time.Now().Add(time.Hour).Format(time.RFC3339)
-	previous := []ProviderQuotaWindow{{Name: "5h", RemainingPercent: &remaining, ResetAt: &reset}}
+	previous := []ProviderQuotaWindow{{Name: "5h", RemainingPercent: &lowRemaining, ResetAt: &reset}}
 	fresh := []ProviderQuotaWindow{{Name: "5h", RemainingPercent: &remaining}}
 	if providerRecoveryVerified(previous, fresh, cfg, time.Now()) {
 		t.Fatal("recovered before reset")

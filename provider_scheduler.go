@@ -16,27 +16,49 @@ var (
 	providerRunnerMu   sync.Mutex
 	providerRunnerStop chan struct{}
 	providerRunnerDone chan struct{}
+	providerRunnerWake chan struct{}
 )
 
-// providerRecoveryVerified 防止旧窗口消失或尚未重置时误恢复暂停账号。
+// providerRecoveryVerified 仅要求曾触发保护的窗口重置，且所有已知窗口达到恢复阈值。
+// 缺失窗口、未知重置时间和仍处于旧周期的受保护窗口都不能触发自动恢复。
 func providerRecoveryVerified(previous, fresh []ProviderQuotaWindow, cfg Config, now time.Time) bool {
+	if len(previous) == 0 || !providerMeetsRecoveryThreshold(fresh, cfg) {
+		return false
+	}
 	byName := make(map[string]ProviderQuotaWindow, len(fresh))
 	for _, window := range fresh {
 		byName[window.Name] = window
 	}
+	protected := false
 	for _, window := range previous {
 		current, ok := byName[window.Name]
 		if !ok || current.RemainingPercent == nil {
 			return false
 		}
-		if window.ResetAt != nil {
-			reset, err := time.Parse(time.RFC3339, *window.ResetAt)
-			if err != nil || now.Before(reset) {
-				return false
-			}
+		if window.RemainingPercent == nil {
+			return false
+		}
+		if *window.RemainingPercent > providerProtectionThreshold(window.Name, cfg) {
+			continue
+		}
+		protected = true
+		if window.ResetAt == nil || *window.ResetAt == "" {
+			return false
+		}
+		reset, err := time.Parse(time.RFC3339, *window.ResetAt)
+		if err != nil || now.Before(reset) {
+			return false
 		}
 	}
-	return providerMeetsRecoveryThreshold(fresh, cfg)
+	return protected
+}
+
+func providerProtectionThreshold(name string, cfg Config) float64 {
+	nameLower := strings.ToLower(name)
+	if strings.Contains(nameLower, "5h") || strings.Contains(nameLower, "5小时") {
+		return cfg.FiveHourRemainingThreshold
+	}
+	return cfg.LongWindowRemainingThreshold
 }
 
 // providerNeedsProtectionPause 检查非 Codex 账号的真实配额窗口是否触发低额度保护暂停。
@@ -171,18 +193,14 @@ func startProviderBackgroundRunner() {
 	done := make(chan struct{})
 	providerRunnerStop = stop
 	providerRunnerDone = done
+	wake := make(chan struct{}, 1)
+	providerRunnerWake = wake
 
 	// 初始化时载入历史持久化状态
 	globalMultiProviderRegistry.loadFromDisk()
 
 	go func() {
 		defer close(done)
-		interval := globalState.Config().QuotaProtectionInterval
-		if interval <= 0 {
-			interval = 5 * time.Minute
-		}
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
 
 		// 启动时在后台做一次初次探测
 		func() {
@@ -192,16 +210,38 @@ func startProviderBackgroundRunner() {
 		}()
 
 		for {
+			interval := globalState.Config().QuotaProtectionInterval
+			if interval <= 0 {
+				interval = 5 * time.Minute
+			}
+			timer := time.NewTimer(interval)
 			select {
 			case <-stop:
+				timer.Stop()
 				return
-			case <-ticker.C:
+			case <-wake:
+				timer.Stop()
+				continue
+			case <-timer.C:
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 				_, _ = RefreshProviderAccounts(ctx, true)
 				cancel()
 			}
 		}
 	}()
+}
+
+// wakeProviderBackgroundRunner 让新的检查间隔在保存设置后立即重新排期。
+func wakeProviderBackgroundRunner() {
+	providerRunnerMu.Lock()
+	wake := providerRunnerWake
+	providerRunnerMu.Unlock()
+	if wake != nil {
+		select {
+		case wake <- struct{}{}:
+		default:
+		}
+	}
 }
 
 // stopProviderBackgroundRunner 安全停止后台探测循环。
@@ -211,6 +251,7 @@ func stopProviderBackgroundRunner() {
 	done := providerRunnerDone
 	providerRunnerStop = nil
 	providerRunnerDone = nil
+	providerRunnerWake = nil
 	providerRunnerMu.Unlock()
 
 	if stop != nil {

@@ -22,7 +22,7 @@ const (
 	FallbackFillFirst FallbackMode = "fill-first"
 )
 
-var pluginVersion = "0.4.6"
+var pluginVersion = "0.4.7"
 
 type MonthlyMode string
 
