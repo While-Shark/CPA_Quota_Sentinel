@@ -99,23 +99,38 @@ func PickCodexAccount(req pluginapi.SchedulerPickRequest, snapshot StateSnapshot
 	if len(ordered) == 0 {
 		return PickDecision{Reason: "no_codex_candidates", Ordered: ordered}
 	}
-	for _, account := range ordered {
-		if account.Available {
-			return PickDecision{
-				AuthID:  account.AuthID,
-				Handled: true,
-				Reason:  "selected",
-				Ordered: ordered,
+	if snapshot.Annotations.Queue.Mode == QueueModeManual {
+		published := schedulerSnapshotFromState(snapshot, nil)
+		candidates := make([]Candidate, 0, len(req.Candidates))
+		for _, candidate := range req.Candidates {
+			candidates = append(candidates, Candidate{ID: candidate.ID, Provider: candidate.Provider, Status: candidate.Status})
+		}
+		if result := selectManualAccount(*published, candidates, now, nil, nil, true); result.AuthID != "" {
+			return PickDecision{AuthID: result.AuthID, Handled: true, Reason: "selected", Ordered: ordered}
+		}
+	}
+	if snapshot.Annotations.Queue.Mode != QueueModeManual {
+		for _, account := range ordered {
+			if account.Available {
+				return PickDecision{
+					AuthID:  account.AuthID,
+					Handled: true,
+					Reason:  "selected",
+					Ordered: ordered,
+				}
 			}
 		}
 	}
 
 	if snapshot.Config.QuotaProtectionEnabled {
 		for _, account := range ordered {
-		if account.selectionView.QuotaProtectionPaused {
-			return PickDecision{Handled: true, Reject: true, Reason: "quota_protection", Ordered: ordered}
+			if account.selectionView.QuotaProtectionPaused {
+				return PickDecision{Handled: true, Reject: true, Reason: "quota_protection", Ordered: ordered}
+			}
 		}
-		}
+	}
+	if snapshot.Annotations.Queue.Mode == QueueModeManual {
+		return PickDecision{Handled: true, Reject: true, Reason: "manual_queue_unavailable", Ordered: ordered}
 	}
 	if snapshot.Config.Fallback == FallbackFillFirst {
 		return PickDecision{
@@ -218,6 +233,16 @@ func buildOrderedAccounts(req pluginapi.SchedulerPickRequest, snapshot StateSnap
 		})
 	}
 
+	manualRanks := make(map[string]int)
+	if snapshot.Annotations.Queue.Mode == QueueModeManual {
+		ids := make([]string, 0, len(ordered))
+		for _, a := range ordered {
+			ids = append(ids, a.AuthID)
+		}
+		for index, entry := range effectiveManualQueue(snapshot.Annotations.Queue, ids) {
+			manualRanks[entry.AuthID] = index
+		}
+	}
 	sort.SliceStable(ordered, func(i, j int) bool {
 		left, right := ordered[i], ordered[j]
 		if left.selectionClass != right.selectionClass {
@@ -230,7 +255,13 @@ func buildOrderedAccounts(req pluginapi.SchedulerPickRequest, snapshot StateSnap
 			if left.CPAPriority != right.CPAPriority {
 				return left.CPAPriority > right.CPAPriority
 			}
+			if snapshot.Annotations.Queue.Mode == QueueModeManual {
+				return manualRanks[left.AuthID] < manualRanks[right.AuthID]
+			}
 			return accountViewLess(left.selectionView, right.selectionView, snapshot.Config.MonthlyMode)
+		}
+		if snapshot.Annotations.Queue.Mode == QueueModeManual {
+			return manualRanks[left.AuthID] < manualRanks[right.AuthID]
 		}
 		if !left.SortTime.Equal(right.SortTime) {
 			if left.SortTime.IsZero() {

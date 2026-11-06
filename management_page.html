@@ -291,6 +291,32 @@ code,.mono,.number{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation 
 @media(max-width:620px){.accounts-grid,.metrics{grid-template-columns:1fr}.metrics{gap:9px}.metric{min-height:68px}.page-header{align-items:flex-start}.header-status{font-size:10px}.header-status .demo-tag{display:none}.setting-row{grid-template-columns:1fr;gap:9px}.setting-control{justify-content:flex-start}.retry-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.advanced-grid{grid-template-columns:1fr}.retry-event{grid-template-columns:1fr}.modal-form-grid{grid-template-columns:1fr}.toolbar{align-items:flex-start}.settings-savebar{flex-direction:column;align-items:stretch}.settings-savebar .toolbar-actions{justify-content:flex-end}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 
+
+/* Manual rotation queue */
+.queue-settings{padding:23px 25px;margin-bottom:17px}
+.queue-settings .segmented{margin:4px 0 10px}
+.queue-hint{font-size:12px;color:var(--muted);line-height:1.75;margin:10px 0 0}
+.queue-list-panel{padding:0 0 7px}
+.queue-list-heading{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;padding:19px 23px;border-bottom:1px solid var(--line)}
+.queue-list-heading h2{margin:0;font-size:15px}
+.queue-list-heading p{margin:4px 0 0;font-size:11px;color:var(--muted)}
+.queue-list{list-style:none;margin:0;padding:12px 16px;display:grid;gap:9px}
+.queue-account{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);background:var(--surface);border-radius:12px;min-width:0;transition:border-color var(--motion),box-shadow var(--motion)}
+.queue-account:hover{border-color:#b5cff9}
+.queue-account.queue-drop-target{border-color:var(--primary);background:var(--primary-wash);box-shadow:inset 0 0 0 1px var(--primary)}
+.queue-account-unavailable{background:var(--surface-subtle)}
+.queue-grip{display:grid;place-items:center;flex:none;width:25px;height:34px;cursor:grab;touch-action:none;color:var(--muted);font-size:21px;user-select:none}
+.queue-grip:active{cursor:grabbing}
+.queue-order{flex:none;display:grid;place-items:center;width:27px;height:27px;border-radius:9px;background:var(--primary-wash);color:var(--primary);font-weight:800;font-size:12px;font-variant-numeric:tabular-nums}
+.queue-account-info{min-width:0;flex:1;display:grid;gap:2px}
+.queue-account-info strong{font-size:12px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.queue-account-info .mono{color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.queue-weight{display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:11px;color:var(--muted)}
+.queue-weight .input{width:68px;min-height:32px;text-align:center;color:var(--ink);font-weight:750}
+.queue-move{display:flex;align-items:center;gap:5px}
+.queue-move button{min-width:29px;min-height:31px;padding:3px 7px}
+@media(max-width:850px){.queue-account{flex-wrap:wrap}.queue-account-info{flex-basis:55%}.queue-availability{margin-left:auto}.queue-weight{margin-left:40px}.queue-list-heading .toolbar-actions{width:100%}}
+@media(max-width:540px){.queue-settings{padding:18px}.queue-list{padding:10px}.queue-account{gap:7px;padding:10px}.queue-account-info{flex:1 1 58%}.queue-weight{margin-left:0}.queue-move{margin-left:auto}.queue-list-heading{padding:16px}}
 </style>
 </head>
 <body>
@@ -323,6 +349,7 @@ function t(key){const dict=TRANSLATIONS[state.lang]||TRANSLATIONS.en;return dict
 const icons={
   grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   logs:'<path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  list:'<path d="M9 5h12M9 12h12M9 19h12"/><circle cx="4" cy="5" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="19" r="1"/>',
   settings:'<path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="4"/>',
   retry:'<path d="M19 7v5h-5M5 17v-5h5"/><path d="M6.5 9A6 6 0 0 1 17.4 7L19 12M5 12l1.7 5A6 6 0 0 0 17.5 15"/>',
   refresh:'<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.2 9A7 7 0 0 1 18.3 7L20 12M4 12l1.7 5A7 7 0 0 0 17.8 15"/>',
@@ -393,6 +420,7 @@ const state={
  accounts:[],providerAccounts:[],providerError:'',logs:[],nextId:'',lastSelected:'',monthlyMode:'expiry_order',
  rosterTitle:'',rosterBody:'',
  settingsSaved:null,settingsDraft:null,settingsDirty:false,
+ queueSaved:null,queueDraft:null,queueDirty:false,dragQueueId:'',
  retrySaved:null,retryDraft:null,retryDirty:false,
  retryRuntime:{mode:'off',requests:0,retries:0,succeeded:0,failed:0,shadow_hits:0,events:[]},
  catalog:{providers:[],models:[],loaded:false},catalogNote:'',
@@ -435,7 +463,7 @@ async function copyTextWithFallback(value){
 }
 function safeDownload(name,text){const blob=new Blob([text],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 /* ---- adapters: API <-> view model ---- */
-function normalizeStatus(raw){raw=raw||{};if(raw.management_path||(raw.settings||{}).management_path)STATUS.management_path=raw.management_path||raw.settings.management_path;state.accounts=Array.isArray(raw.accounts)?raw.accounts:[];state.logs=Array.isArray(raw.logs)?raw.logs:[];state.nextId=raw.next_auth_id||'';state.lastSelected=raw.last_selected||'';state.monthlyMode=raw.monthly_mode||'expiry_order';const roster=raw.roster||{};const messages=[roster.warning,roster.risk_warning].filter(Boolean);state.rosterTitle=[roster.capability,roster.health].filter(Boolean).join(' / ')||'Roster lifecycle';state.rosterBody=messages.join(' ');}
+function normalizeStatus(raw){raw=raw||{};if(raw.management_path||(raw.settings||{}).management_path)STATUS.management_path=raw.management_path||raw.settings.management_path;state.accounts=Array.isArray(raw.accounts)?raw.accounts:[];state.logs=Array.isArray(raw.logs)?raw.logs:[];state.nextId=raw.next_auth_id||'';state.lastSelected=raw.last_selected||'';state.monthlyMode=raw.monthly_mode||'expiry_order';const roster=raw.roster||{};const messages=[roster.warning,roster.risk_warning].filter(Boolean);state.rosterTitle=[roster.capability,roster.health].filter(Boolean).join(' / ')||'Roster lifecycle';state.rosterBody=messages.join(' ');state.queueSaved=queueFromAPI(raw.queue);if(!state.queueDirty)state.queueDraft=queueAddAccounts(clone(state.queueSaved));}
 const SETTING_MAP=[
  ['scheduler_enabled','handle_enabled','toggle'],['fallback_lower_priority','schedule_across_priorities','toggle'],
  ['monthly_mode','monthly_mode','radio'],['refresh_interval','quota_refresh_interval','duration'],
@@ -481,7 +509,7 @@ function validateSettings(draft){
 function validateRetry(draft){const a=draft.advanced;if(draft.mode==='on'&&draft.chains.length===0)throw new Error(tr('启用重试时，至少配置一条模型链','Enabled retry requires at least one chain'));if(new Set(draft.chains.map(c=>String(c.source).trim())).size!==draft.chains.length)throw new Error(tr('原始模型不能重复','Source models must be unique'));if(draft.chains.some(c=>!String(c.source).trim()||!c.targets.length||c.targets.some(t=>!String(t.model).trim())))throw new Error(tr('模型名不可为空，每条链至少有一个备用目标','Each chain needs a source and at least one valid target'));if(!Number.isInteger(+a.maxAttempts)||+a.maxAttempts<1||+a.maxAttempts>16)throw new Error(tr('最大尝试次数必须为 1–16','Max attempts must be 1–16'));if(['silenceTimeout','waitTimeout','totalTimeout'].some(k=>!isDuration(a[k])))throw new Error(tr('高级参数存在非法时长','Invalid duration in advanced settings'));if(!/^\d+(\.\d+)?(B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)$/i.test(String(a.maxBytes).trim()))throw new Error(tr('字节上限格式应为 8MB 这样的写法','Byte limit must look like 8MB'));if(+a.maxFrames<=0)throw new Error(tr('帧上限必须大于 0','Frame limit must be positive'));}
 /* ---- render: shell ---- */
 function renderSidebar(){
- const nav=[['overview','grid',['账号总览','Overview']],['logs','logs',['日志','Logs']],['settings','settings',['调度设置','Scheduling']],['retry','retry',['模型重试链','Model retry chains']]];
+ const nav=[['overview','grid',['账号总览','Overview']],['queue','list',['账号轮转队列','Account rotation']],['logs','logs',['日志','Logs']],['settings','settings',['调度设置','Scheduling']],['retry','retry',['模型重试链','Model retry chains']]];
  return `<aside class="sidebar">
  <div class="brand"><div class="brand-mark" aria-hidden="true"><svg width="25" height="25" viewBox="0 0 40 25" fill="none"><path d="M19 12.5C11 1 4 4 4 12.5S11 24 19 12.5 34 1 36 12.5s-7 11-17 0" stroke="white" stroke-width="4.2" stroke-linecap="round"/></svg></div><div><div class="brand-title">CPA_Quota_Sentinel</div><div class="brand-subtitle">${tr('Codex 额度保护与调度','Codex quota protection and scheduling')}</div></div></div>
  <nav class="nav" aria-label="${tr('主导航','Main navigation')}">${nav.map(([route,icon,label])=>`<a class="nav-item" href="#${route}" ${state.route===route?'aria-current="page"':''}>${ic(icon,17)}<span>${tr(...label)}</span></a>`).join('')}</nav>
@@ -589,6 +617,59 @@ function renderOverview(){
  <div class="section-heading"><h2>${tr('Codex 调度队列','Codex scheduling queue')} <span>(${state.accounts.length})</span></h2><span>${tr('当前可用','Available')} ${available} / ${state.accounts.length} · ${tr('按调度顺序显示','Ordered by scheduler priority')}</span></div>
  ${state.accounts.length?`<section class="accounts-grid">${state.accounts.map(accountCard).join('')}</section>`:`<div class="panel empty"><div class="empty-icon">${ic('users',24)}</div><h3>${E(empty.title||tr('暂无账号数据','No account data yet'))}</h3><p>${E(empty.message||tr('等待额度刷新后，这里会显示账号卡片。','Cards will appear after the next quota refresh.'))}</p></div>`}${renderProviderAccounts()}`;
 }
+
+/* ---- manual Codex rotation queue ---- */
+function queueFromAPI(raw){
+ raw=raw||{};const mode=raw.mode==='manual'?'manual':'auto',seen=new Set();
+ const entries=(Array.isArray(raw.entries)?raw.entries:[]).filter(item=>item&&typeof item.auth_id==='string').map(item=>({auth_id:item.auth_id,weight:Number(item.weight)})).filter(item=>{if(!item.auth_id||seen.has(item.auth_id))return false;seen.add(item.auth_id);return true});
+ return {mode,entries};
+}
+function queueAddAccounts(queue){
+ const out=clone(queue),seen=new Set(out.entries.map(entry=>entry.auth_id));
+ for(const account of state.accounts){if(!account.auth_id||seen.has(account.auth_id))continue;seen.add(account.auth_id);out.entries.push({auth_id:account.auth_id,weight:1})}
+ return out;
+}
+function validateQueue(queue){
+ if(!['auto','manual'].includes(queue.mode))throw new Error(tr('不支持的轮转模式','Unknown rotation mode'));
+ if(queue.entries.length>500)throw new Error(tr('队列最多 500 个账号','Queue supports up to 500 accounts'));
+ const ids=new Set();
+ for(const item of queue.entries){
+  if(!item.auth_id||item.auth_id.length>256||ids.has(item.auth_id))throw new Error(tr('队列中存在无效或重复账号','Invalid or duplicate account in queue'));
+  ids.add(item.auth_id);
+  if(!Number.isInteger(item.weight)||item.weight<1||item.weight>10)throw new Error(tr('账号权重必须为 1–10 的整数','Account weight must be an integer from 1 to 10'));
+ }
+}
+function queueMove(from,to){
+ const entries=state.queueDraft.entries;if(from<0||to<0||from>=entries.length||to>=entries.length||from===to)return;
+ const [entry]=entries.splice(from,1);entries.splice(to,0,entry);state.queueDirty=true;renderKeepScroll();
+}
+function renderQueue(){
+ const q=state.queueDraft||queueAddAccounts(queueFromAPI({}));
+ const manual=q.mode==='manual',accountById=new Map(state.accounts.map(a=>[a.auth_id,a]));
+ const rows=q.entries.map((item,i)=>{
+  const a=accountById.get(item.auth_id),available=!!(a&&a.available&&!a.quota_protection_paused);
+  return `<li class="queue-account ${available?'':'queue-account-unavailable'}" data-queue-row="${E(item.auth_id)}">
+   <div class="queue-grip" draggable="true" data-queue-drag="${E(item.auth_id)}" title="${tr('拖动调整顺序','Drag to reorder')}">☷</div>
+   <span class="queue-order">${i+1}</span>
+   <div class="queue-account-info"><strong>${E(a&&(a.alias||a.auth_id)||item.auth_id)}</strong><span class="mono">${E(item.auth_id)}</span></div>
+   <span class="queue-availability">${available?pill(tr('可用','Available'),'green'):pill(a?tr('暂不可用','Unavailable'):tr('账号未加载','Not loaded'),'grey')}</span>
+   <label class="queue-weight"><span>${tr('权重','Weight')}</span><input class="input" type="number" min="1" max="10" step="1" data-queue-weight="${E(item.auth_id)}" value="${E(item.weight)}"></label>
+   <div class="queue-move"><button class="btn btn-sm" type="button" data-action="queue-top" data-index="${i}" ${i===0?'disabled':''} title="${tr('置顶','To top')}">⇧</button><button class="btn btn-sm" type="button" data-action="queue-up" data-index="${i}" ${i===0?'disabled':''} title="${tr('上移','Move up')}">↑</button><button class="btn btn-sm" type="button" data-action="queue-down" data-index="${i}" ${i===q.entries.length-1?'disabled':''} title="${tr('下移','Move down')}">↓</button></div>
+  </li>`;
+ }).join('');
+ return `${renderHeader(tr('账号轮转队列','Account rotation queue'),tr('保留自动调度，新增可手动排序和加权轮转的模式','Keep automatic scheduling and optionally set a weighted rotation'))}
+ ${rosterWarning()}
+ <section class="panel queue-settings">
+  <div class="panel-title"><div><h2>${tr('调度模式','Scheduling mode')}</h2><p>${tr('默认是现有自动模式，保存之后才改变真实请求路由','Automatic is the default. Routing changes only after you save.')}</p></div>${pill(manual?tr('自定义队列','Manual queue'):tr('自动调度','Automatic'),manual?'blue':'green')}</div>
+  <div class="segmented" role="group" aria-label="${tr('调度模式','Scheduling mode')}"><button type="button" data-action="queue-mode" data-mode="auto" aria-pressed="${!manual}">${tr('自动模式','Automatic')}</button><button type="button" data-action="queue-mode" data-mode="manual" aria-pressed="${manual}">${tr('自定义队列','Manual queue')}</button></div>
+  <p class="queue-hint">${manual?tr('按顺序加权轮转：权重 3 的账号连续使用 3 次，然后轮到下一账号。','Weighted rotation: weight 3 receives three consecutive requests before the next account.'):tr('保持原有的额度、到期时间和插件优先级自动排序，忽略手动顺序和权重。','Keep quota/expiry/priority ordering. Manual order and weights are ignored.')}</p>
+  <p class="queue-hint">${tr('CPA 高优先级账号仍优先；已停用、额度不足、熔断的账号会被跳过。此处权重仅影响本插件，不修改 CPA 原生账号权重。','CPA priority tiers remain first; disabled, exhausted and circuit-open accounts are skipped. These weights do not change native CPA weights.')}</p>
+ </section>
+ <section class="panel queue-list-panel"><div class="queue-list-heading"><div><h2>${tr('账号顺序与权重','Account order and weights')} (${q.entries.length})</h2><p>${tr('拖动调整，也可使用置顶、上移、下移按钮','Drag to reorder, or use the buttons.')}</p></div><div class="toolbar-actions">${button('queue-sort-weight',tr('按权重降序','Sort by weight'),'btn-sm')}${button('queue-auto-order',tr('恢复自动排序','Use automatic order'),'btn-sm')}</div></div>
+  <ol class="queue-list">${rows||tr('暂无账号，请先加载 Codex 额度数据','No accounts yet. Load Codex quota data first.')}</ol></section>
+ <div class="settings-savebar"><div class="dirty-label">${state.queueDirty?`<strong>● ${tr('有未保存的修改','Unsaved changes')}</strong>`:tr('队列已保存','Queue saved')} · ${tr('下一账号','Next account')}: <strong>${E(state.nextId||'—')}</strong></div><div class="toolbar-actions">${button('queue-revert',tr('撤销修改','Discard changes'))}${button('queue-save',ic('check',15)+tr('保存并应用','Save and apply'),'btn-primary')}</div></div>`;
+}
+
 /* ---- render: logs ---- */
 function logFieldsText(log){if(!log.fields)return '';if(typeof log.fields==='string')return log.fields;return Object.entries(log.fields).map(([key,value])=>`${key}=${value}`).join(', ');}
 function renderLogs(){
@@ -760,11 +841,11 @@ function renderRetry(){
  </div><datalist id="known-models">${state.catalog.models.map(model=>`<option value="${E(model)}"></option>`).join('')}</datalist><datalist id="known-providers">${state.catalog.providers.map(provider=>`<option value="${E(provider)}"></option>`).join('')}</datalist>`;
 }
 /* ---- render: root ---- */
-function getRoute(){const route=location.hash.replace('#','');return ['overview','logs','settings','retry'].includes(route)?route:'overview';}
+function getRoute(){const route=location.hash.replace('#','');return ['overview','queue','logs','settings','retry'].includes(route)?route:'overview';}
 function renderNotLoaded(){return `<div class="not-loaded"><div class="panel empty" style="width:min(520px,100%);padding:35px"><div class="empty-icon">${ic('lock',24)}</div><h3>${tr('连接至 CPA 管理中心','Connect to CPA management')}</h3><p>${tr('输入 CPA 管理密钥以加载账号额度和轮换设置。密钥仅发送到当前 CPA 管理接口。','Enter your CPA admin key to load account quotas and rotation settings. The key is only sent to this CPA management API.')}</p><label for="loginKeyInput">${tr('CPA 管理密钥','CPA admin key')}</label><input id="loginKeyInput" type="password" value="${E(state.key)}" placeholder="${tr('输入 CPA 管理密钥','Enter CPA admin key')}" autocomplete="off" style="display:block;width:100%;margin:10px 0;padding:10px" aria-invalid="${state.keyError}"><p class="mono" style="overflow-wrap:anywhere">${E(managementBase())}</p><div style="margin-top:17px">${button('load',tr('加载数据','Load data'),'btn-primary')}</div></div></div>`;}
 function render(){
  state.route=getRoute();document.documentElement.lang=state.lang==='en'?'en':'zh-CN';
- const content=state.loaded?({overview:renderOverview,logs:renderLogs,settings:renderSettings,retry:renderRetry}[state.route]||renderOverview)():renderNotLoaded();
+ const content=state.loaded?({overview:renderOverview,queue:renderQueue,logs:renderLogs,settings:renderSettings,retry:renderRetry}[state.route]||renderOverview)():renderNotLoaded();
  document.getElementById('app').innerHTML=`<div class="app-shell">${renderSidebar()}<main id="main" class="workspace" tabindex="-1">${content}</main></div>`;
 }
 function renderKeepScroll(){
@@ -810,6 +891,20 @@ document.addEventListener('click',async(ev)=>{
  const action=nodeTarget.dataset.action;const id=nodeTarget.dataset.id;const ci=Number(nodeTarget.dataset.ci);const ti=Number(nodeTarget.dataset.ti);
  const chain=Number.isInteger(ci)?state.retryDraft.chains[ci]:null;
  try{
+  if(action==='queue-mode'){state.queueDraft.mode=nodeTarget.dataset.mode==='manual'?'manual':'auto';state.queueDirty=true;renderKeepScroll();return}
+  if(action==='queue-up'||action==='queue-down'||action==='queue-top'){
+   const index=Number(nodeTarget.dataset.index);queueMove(index,action==='queue-top'?0:index+(action==='queue-up'?-1:1));return}
+  if(action==='queue-sort-weight'){state.queueDraft.entries.sort((a,b)=>b.weight-a.weight);state.queueDirty=true;renderKeepScroll();return}
+  if(action==='queue-auto-order'){
+   const weights=new Map(state.queueDraft.entries.map(entry=>[entry.auth_id,entry.weight]));
+   state.queueDraft.entries=state.accounts.map(a=>({auth_id:a.auth_id,weight:weights.get(a.auth_id)||1}));
+   state.queueDirty=true;renderKeepScroll();return}
+  if(action==='queue-revert'){state.queueDraft=queueAddAccounts(clone(state.queueSaved||queueFromAPI({})));state.queueDirty=false;renderKeepScroll();return}
+  if(action==='queue-save'){
+   validateQueue(state.queueDraft);
+   const saved=await requestManagement('/queue',{method:'PUT',body:state.queueDraft});
+   state.queueSaved=queueFromAPI(saved);state.queueDirty=false;
+   await refreshSnapshot();renderKeepScroll();toast(tr('队列已保存并立即生效','Queue saved and applied immediately'));return}
   if(action==='refresh-provider-accounts'){await refreshProviderAccounts(true);renderKeepScroll();return}
   if(action==='load'){
     if(!state.loaded){await loadStatus();await refreshRetryRuntime();renderKeepScroll();toast(tr('已加载当前状态','Current state loaded'),'',0)}
@@ -865,6 +960,11 @@ document.addEventListener('change',(ev)=>{
  const el=ev.target;const d=el.dataset;
  if(el.id==='language'){state.lang=el.value;try{window.localStorage.setItem(LOCALE_STORAGE_KEY,state.lang)}catch(error){}renderKeepScroll();return}
  if(el.id==='rememberKey'){state.remember=el.checked;persistRememberKey();return}
+ if(d.queueWeight!==undefined){
+  const weight=Number(el.value),entry=state.queueDraft&&state.queueDraft.entries.find(item=>item.auth_id===d.queueWeight);
+  if(!entry)return;
+  if(!Number.isInteger(weight)||weight<1||weight>10){el.setCustomValidity(tr('权重只能是 1–10 的整数','Weight must be an integer from 1 to 10'));el.reportValidity();return}
+  el.setCustomValidity('');entry.weight=weight;state.queueDirty=true;return}
  if(d.setting&&el.type==='checkbox'){
   if(['probe_unconfirmed_roster','managed_disable'].includes(d.setting)&&el.checked&&!window.confirm(tr('此选项存在风险：可能使用过期账号列表探测，或写宿主认证文件。确认启用？','This option can probe with a stale roster or modify CPA auth files. Enable it?'))){el.checked=false;return}
   state.settingsDraft[d.setting]=el.checked;state.settingsDirty=true;renderKeepScroll();return}
@@ -875,6 +975,23 @@ document.addEventListener('change',(ev)=>{
  if(d.durationValue||d.durationUnit){const key=d.durationValue||d.durationUnit;const numberEl=document.querySelector(`[data-duration-value="${key}"]`);const unitEl=document.querySelector(`[data-duration-unit="${key}"]`);try{state.settingsDraft[key]=buildDuration(numberEl.value,unitEl.value);state.settingsDirty=true;if(el===unitEl)renderKeepScroll()}catch(error){toast(error.message,'error')}return}
  if(d.advanced&&el.type==='checkbox'){state.retryDraft.advanced[d.advanced]=el.checked;state.retryDirty=true;renderKeepScroll();return}
 });
+document.addEventListener('dragstart',ev=>{
+ const grip=ev.target.closest('[data-queue-drag]');if(!grip||state.route!=='queue')return;
+ state.dragQueueId=grip.dataset.queueDrag;ev.dataTransfer.effectAllowed='move';ev.dataTransfer.setData('text/plain',state.dragQueueId);
+});
+document.addEventListener('dragover',ev=>{
+ const row=ev.target.closest('[data-queue-row]');if(!row||!state.dragQueueId)return;
+ ev.preventDefault();ev.dataTransfer.dropEffect='move';
+ document.querySelectorAll('.queue-drop-target').forEach(el=>el.classList.remove('queue-drop-target'));
+ row.classList.add('queue-drop-target');
+});
+document.addEventListener('drop',ev=>{
+ const row=ev.target.closest('[data-queue-row]');if(!row||!state.dragQueueId)return;ev.preventDefault();
+ const entries=state.queueDraft.entries,from=entries.findIndex(e=>e.auth_id===state.dragQueueId),to=entries.findIndex(e=>e.auth_id===row.dataset.queueRow);
+ state.dragQueueId='';queueMove(from,to);
+ document.querySelectorAll('.queue-drop-target').forEach(el=>el.classList.remove('queue-drop-target'));
+});
+document.addEventListener('dragend',()=>{state.dragQueueId='';document.querySelectorAll('.queue-drop-target').forEach(el=>el.classList.remove('queue-drop-target'))});
 document.addEventListener('toggle',ev=>{if(ev.target.dataset&&ev.target.dataset.protectionAdvanced!==undefined)state.protectionAdvancedOpen=ev.target.open},true);
 document.getElementById('editDialog').addEventListener('submit',(ev)=>{ev.preventDefault();saveAccountForm(ev.target)});
 document.getElementById('importFile').addEventListener('change',async(ev)=>{
@@ -901,8 +1018,8 @@ function syncSavebarDirty(){
   if(warning)save.title=warning;else save.removeAttribute('title');
  });
 }
-window.addEventListener('hashchange',()=>{if(!['overview','logs','settings','retry'].includes(location.hash.slice(1)))history.replaceState(null,'','#overview');render();window.scrollTo({top:0,behavior:'instant'})});
-if(!['overview','logs','settings','retry'].includes(location.hash.slice(1)))history.replaceState(null,'','#overview');
+window.addEventListener('hashchange',()=>{if(!['overview','queue','logs','settings','retry'].includes(location.hash.slice(1)))history.replaceState(null,'','#overview');render();window.scrollTo({top:0,behavior:'instant'})});
+if(!['overview','queue','logs','settings','retry'].includes(location.hash.slice(1)))history.replaceState(null,'','#overview');
 state.lang=detectLocale();
 restoreRememberedManagementKey();
 watchParentLocale();

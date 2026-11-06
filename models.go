@@ -121,9 +121,29 @@ type GroupAnnotation struct {
 	Color string   `json:"color,omitempty" yaml:"color,omitempty"`
 }
 
+type QueueMode string
+
+const (
+	QueueModeAuto   QueueMode = "auto"
+	QueueModeManual QueueMode = "manual"
+)
+
+type ManualQueueEntry struct {
+	AuthID string `json:"auth_id" yaml:"auth_id"`
+	Weight int    `json:"weight" yaml:"weight"`
+}
+
+// ManualQueueConfig is user-managed routing order, independent of CPA's
+// native priority tier and the account's automatic scheduler priority.
+type ManualQueueConfig struct {
+	Mode    QueueMode          `json:"mode" yaml:"mode"`
+	Entries []ManualQueueEntry `json:"entries" yaml:"entries"`
+}
+
 type AnnotationState struct {
 	Accounts map[string]AccountAnnotation `json:"accounts,omitempty" yaml:"accounts,omitempty"`
 	Groups   map[string]GroupAnnotation   `json:"groups,omitempty" yaml:"groups,omitempty"`
+	Queue    ManualQueueConfig            `json:"queue" yaml:"queue"`
 }
 
 type AccountState struct {
@@ -149,16 +169,16 @@ type AccountState struct {
 	// LastObservedAt records when quota state was last observed inside a real
 	// response stream (codex.rate_limits frame or usage-record response
 	// headers). It is in-memory only and resets on restart.
-	LastObservedAt     time.Time
-	LastError          string
-	Stale              bool
-	TemporaryExhausted bool
-	TemporaryResetAt   time.Time
+	LastObservedAt        time.Time
+	LastError             string
+	Stale                 bool
+	TemporaryExhausted    bool
+	TemporaryResetAt      time.Time
 	QuotaProtectionPaused bool
-	Circuit            CircuitBreakerState
-	Refresh            AccountRefreshState
-	ResetProbes        map[WindowKind]ResetProbeState
-	Annotation         AccountAnnotation
+	Circuit               CircuitBreakerState
+	Refresh               AccountRefreshState
+	ResetProbes           map[WindowKind]ResetProbeState
+	Annotation            AccountAnnotation
 }
 
 type CPAAdmissionState struct {
@@ -184,6 +204,7 @@ type StateSnapshot struct {
 	CPAAdmission        CPAAdmissionState
 	CPAAdmissionVersion uint64
 	Annotations         AnnotationState
+	QueueRotation       *ManualQueueRotation
 	Logs                []LogEntry
 	LastSelected        string
 	LastReason          string

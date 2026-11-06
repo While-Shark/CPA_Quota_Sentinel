@@ -14,6 +14,7 @@ type PluginState struct {
 	cpaAdmission        CPAAdmissionState
 	cpaAdmissionVersion uint64
 	annotations         AnnotationState
+	queueRotation       *ManualQueueRotation
 	logs                []LogEntry
 	lastSelected        string
 	lastReason          string
@@ -24,9 +25,10 @@ type PluginState struct {
 
 func NewPluginState(cfg Config) *PluginState {
 	return &PluginState{
-		cfg:         NormalizeConfig(cfg),
-		accounts:    make(map[string]AccountState),
-		annotations: NormalizeAnnotationState(AnnotationState{}),
+		cfg:           NormalizeConfig(cfg),
+		accounts:      make(map[string]AccountState),
+		annotations:   NormalizeAnnotationState(AnnotationState{}),
+		queueRotation: &ManualQueueRotation{},
 	}
 }
 
@@ -40,6 +42,7 @@ func (s *PluginState) cloneForLegacyTransaction() *PluginState {
 	out.cpaAdmission = cloneCPAAdmission(s.cpaAdmission)
 	out.cpaAdmissionVersion = s.cpaAdmissionVersion
 	out.annotations = cloneAnnotationState(s.annotations)
+	out.queueRotation = s.queueRotation
 	out.logs = cloneLogs(s.logs)
 	out.lastSelected, out.lastReason, out.lastCodexActivityAt, out.lastAuthScanAt, out.codexAuthCount = s.lastSelected, s.lastReason, s.lastCodexActivityAt, s.lastAuthScanAt, s.codexAuthCount
 	return out
@@ -86,7 +89,12 @@ func (s *PluginState) Config() Config {
 func (s *PluginState) SetAnnotations(state AnnotationState) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.annotations = cloneAnnotationState(NormalizeAnnotationState(state))
+	next := cloneAnnotationState(NormalizeAnnotationState(state))
+	if manualQueueSignature(s.annotations.Queue.Entries) != manualQueueSignature(next.Queue.Entries) ||
+		s.annotations.Queue.Mode != next.Queue.Mode {
+		s.queueRotation.Reset()
+	}
+	s.annotations = next
 }
 
 func (s *PluginState) Annotations() AnnotationState {
@@ -686,6 +694,7 @@ func (s *PluginState) Snapshot(now time.Time) StateSnapshot {
 		CPAAdmission:        cloneCPAAdmission(s.cpaAdmission),
 		CPAAdmissionVersion: s.cpaAdmissionVersion,
 		Annotations:         cloneAnnotationState(s.annotations),
+		QueueRotation:       s.queueRotation,
 		Logs:                cloneLogs(retainedLogs(s.logs, NormalizeConfig(s.cfg), now)),
 		LastSelected:        s.lastSelected,
 		LastReason:          s.lastReason,
@@ -999,6 +1008,7 @@ func cloneAnnotationState(state AnnotationState) AnnotationState {
 	cloned := AnnotationState{
 		Accounts: make(map[string]AccountAnnotation, len(state.Accounts)),
 		Groups:   make(map[string]GroupAnnotation, len(state.Groups)),
+		Queue:    cloneManualQueue(state.Queue),
 	}
 	for key, annotation := range state.Accounts {
 		cloned.Accounts[key] = cloneAccountAnnotation(annotation)

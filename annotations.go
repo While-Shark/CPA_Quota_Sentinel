@@ -13,6 +13,7 @@ func NormalizeAnnotationState(state AnnotationState) AnnotationState {
 	normalized := AnnotationState{
 		Accounts: make(map[string]AccountAnnotation, len(state.Accounts)),
 		Groups:   make(map[string]GroupAnnotation, len(state.Groups)),
+		Queue:    normalizeManualQueue(state.Queue),
 	}
 	for key, annotation := range state.Accounts {
 		annotation.Tags = normalizeTags(annotation.Tags)
