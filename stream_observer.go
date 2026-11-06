@@ -172,17 +172,14 @@ func applyObservedRateLimits(store *PluginState, authID, authIndex string, frame
 		return
 	}
 	quota := ParsedQuota{}
-	if window := observedQuotaWindow(event.RateLimits.Primary, event.RateLimits, now); window != nil {
-		quota.FiveHour = window
-	}
-	if window := observedQuotaWindow(event.RateLimits.Secondary, event.RateLimits, now); window != nil {
-		quota.LongWindow = window
-		quota.Family = familyForWindowMinutes(window.LimitWindowSeconds)
-	}
+	primary := observedQuotaWindow(event.RateLimits.Primary, event.RateLimits, now)
+	assignCodexWindow(&quota, primary)
+	assignCodexWindow(&quota, observedQuotaWindow(event.RateLimits.Secondary, event.RateLimits, now))
 	if quota.FiveHour == nil && quota.LongWindow == nil {
 		return
 	}
-	store.ObserveAccountQuota(authID, authIndex, quota, now)
+	primaryIsLong := primary != nil && (primary.Kind == WindowWeekly || primary.Kind == WindowMonthly)
+	store.ObserveAccountQuota(authID, authIndex, quota, now, primaryIsLong)
 	publishObservedSchedulerState()
 }
 
@@ -223,19 +220,6 @@ func observedQuotaWindow(window *codexRateLimitWindow, limits *codexRateLimitsPa
 	return out
 }
 
-func familyForWindowMinutes(seconds *int64) AccountFamily {
-	if seconds == nil {
-		return ""
-	}
-	const weekSeconds = int64(7 * 24 * time.Hour / time.Second)
-	switch {
-	case *seconds <= weekSeconds:
-		return AccountFamilyWeekly
-	default:
-		return AccountFamilyMonthly
-	}
-}
-
 // publishObservedSchedulerState republishes the scheduler snapshot after an
 // observation changed cached quota state.
 func publishObservedSchedulerState() {
@@ -258,20 +242,20 @@ func applyObservedCodexHeaders(store *PluginState, record pluginapi.UsageRecord,
 	if store == nil || !strings.EqualFold(record.Provider, "codex") || record.Failed {
 		return
 	}
-	quota, ok := codexQuotaFromHeaders(record.ResponseHeaders, now)
+	quota, ok, primaryIsLong := codexQuotaFromHeaders(record.ResponseHeaders, now)
 	if !ok {
 		return
 	}
-	if _, observed := store.ObserveAccountQuota(record.AuthID, record.AuthIndex, quota, now); observed {
+	if _, observed := store.ObserveAccountQuota(record.AuthID, record.AuthIndex, quota, now, primaryIsLong); observed {
 		publishObservedSchedulerState()
 	}
 }
 
 // codexQuotaFromHeaders parses the normalized X-Codex-* header set into
 // quota windows. Field names mirror the host's ParseCodexQuotaEventHeaders.
-func codexQuotaFromHeaders(headers map[string][]string, now time.Time) (ParsedQuota, bool) {
+func codexQuotaFromHeaders(headers map[string][]string, now time.Time) (ParsedQuota, bool, bool) {
 	if len(headers) == 0 {
-		return ParsedQuota{}, false
+		return ParsedQuota{}, false, false
 	}
 	get := func(name string) string {
 		for key, values := range headers {
@@ -291,14 +275,11 @@ func codexQuotaFromHeaders(headers map[string][]string, now time.Time) (ParsedQu
 	limited := allowed == "false" || limitReached == "true"
 
 	quota := ParsedQuota{}
-	if window := quotaWindowFromHeaders(get, "X-Codex-Primary", limited, now); window != nil {
-		quota.FiveHour = window
-	}
-	if window := quotaWindowFromHeaders(get, "X-Codex-Secondary", limited, now); window != nil {
-		quota.LongWindow = window
-		quota.Family = familyForWindowMinutes(window.LimitWindowSeconds)
-	}
-	return quota, quota.FiveHour != nil || quota.LongWindow != nil
+	primary := quotaWindowFromHeaders(get, "X-Codex-Primary", limited, now)
+	assignCodexWindow(&quota, primary)
+	assignCodexWindow(&quota, quotaWindowFromHeaders(get, "X-Codex-Secondary", limited, now))
+	primaryIsLong := primary != nil && (primary.Kind == WindowWeekly || primary.Kind == WindowMonthly)
+	return quota, quota.FiveHour != nil || quota.LongWindow != nil, primaryIsLong
 }
 
 func quotaWindowFromHeaders(get func(string) string, prefix string, limited bool, now time.Time) *QuotaWindow {

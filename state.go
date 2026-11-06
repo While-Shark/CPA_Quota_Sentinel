@@ -391,9 +391,10 @@ func (s *PluginState) ClearAccountAuthFailure(authID string) bool {
 // ObserveAccountQuota merges quota state observed inside a real response
 // stream into the cached account. An observation is bound to an actual call,
 // so it both refreshes the cache (deferring the polling refresh) and runs the
-// same window-identity reconciliation as a polled refresh. Only the windows
-// present in the observation are overwritten; everything else is preserved.
-func (s *PluginState) ObserveAccountQuota(authID, authIndex string, quota ParsedQuota, now time.Time) (AccountState, bool) {
+// same window-identity reconciliation as a polled refresh. Missing windows
+// are preserved, except when the primary window is conclusively long: that
+// layout cannot also have a short primary and invalidates stale fake 5h data.
+func (s *PluginState) ObserveAccountQuota(authID, authIndex string, quota ParsedQuota, now time.Time, primaryIsLong bool) (AccountState, bool) {
 	if authID == "" && authIndex == "" {
 		return AccountState{}, false
 	}
@@ -405,6 +406,9 @@ func (s *PluginState) ObserveAccountQuota(authID, authIndex string, quota Parsed
 	key, account, ok := s.findAccountLocked(authID, authIndex)
 	if !ok {
 		return AccountState{}, false
+	}
+	if primaryIsLong && quota.LongWindow != nil && quota.FiveHour == nil {
+		account.Quota.FiveHour = nil
 	}
 	if quota.FiveHour != nil {
 		account.Quota.FiveHour = quota.FiveHour

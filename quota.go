@@ -141,19 +141,19 @@ func parseRateLimitWindows(rateLimit map[string]any, now time.Time) []QuotaWindo
 
 	var windows []QuotaWindow
 	if primary, ok := getMap(rateLimit, "primary_window", "primaryWindow"); ok {
-		windows = append(windows, parseQuotaWindow(primary, now, WindowFiveHour, exhaustedByEnvelope))
+		windows = append(windows, parseQuotaWindow(primary, now, exhaustedByEnvelope))
 	}
 	if secondary, ok := getMap(rateLimit, "secondary_window", "secondaryWindow"); ok {
-		windows = append(windows, parseQuotaWindow(secondary, now, WindowWeekly, exhaustedByEnvelope))
+		windows = append(windows, parseQuotaWindow(secondary, now, exhaustedByEnvelope))
 	}
 	for i := range windows {
-		classifyWindow(&windows[i], i)
+		classifyWindow(&windows[i])
 	}
 	return windows
 }
 
-func parseQuotaWindow(raw map[string]any, now time.Time, fallbackKind WindowKind, exhaustedByEnvelope bool) QuotaWindow {
-	window := QuotaWindow{Kind: fallbackKind}
+func parseQuotaWindow(raw map[string]any, now time.Time, exhaustedByEnvelope bool) QuotaWindow {
+	window := QuotaWindow{}
 	hasWindowExhaustionSignal := false
 	if usedPercent, ok := getFloat64(raw, "used_percent", "usedPercent"); ok {
 		hasWindowExhaustionSignal = true
@@ -179,6 +179,9 @@ func parseQuotaWindow(raw map[string]any, now time.Time, fallbackKind WindowKind
 	}
 	if seconds, ok := getInt64(raw, "limit_window_seconds", "limitWindowSeconds"); ok {
 		window.LimitWindowSeconds = &seconds
+	} else if minutes, ok := getFloat64(raw, "window_minutes", "windowMinutes"); ok && minutes > 0 {
+		seconds := int64(minutes * 60)
+		window.LimitWindowSeconds = &seconds
 	}
 	if resetAt, ok := getResetAt(raw, now); ok {
 		window.ResetAt = resetAt
@@ -186,13 +189,15 @@ func parseQuotaWindow(raw map[string]any, now time.Time, fallbackKind WindowKind
 	return window
 }
 
-func classifyWindow(window *QuotaWindow, order int) {
+// A primary/secondary position does not identify the window duration.
+// In particular, a weekly-only Codex account may expose its week as primary.
+// Unknown durations must never be silently classified as five-hour quotas.
+func classifyWindow(window *QuotaWindow) {
+	if window == nil {
+		return
+	}
+	window.Kind = ""
 	if window.LimitWindowSeconds == nil {
-		if order == 0 {
-			window.Kind = WindowFiveHour
-		} else if order == 1 {
-			window.Kind = WindowWeekly
-		}
 		return
 	}
 	switch seconds := *window.LimitWindowSeconds; {
@@ -202,6 +207,26 @@ func classifyWindow(window *QuotaWindow, order int) {
 		window.Kind = WindowWeekly
 	case seconds >= minMonthSeconds && seconds <= maxMonthSeconds:
 		window.Kind = WindowMonthly
+	}
+}
+
+// assignCodexWindow adds only duration-identified windows to the protection
+// quota. Unknown windows are not used for threshold or recovery decisions.
+func assignCodexWindow(quota *ParsedQuota, window *QuotaWindow) {
+	if quota == nil || window == nil {
+		return
+	}
+	classifyWindow(window)
+	switch window.Kind {
+	case WindowFiveHour:
+		quota.FiveHour = window
+	case WindowWeekly, WindowMonthly:
+		quota.LongWindow = window
+		if window.Kind == WindowWeekly {
+			quota.Family = AccountFamilyWeekly
+		} else {
+			quota.Family = AccountFamilyMonthly
+		}
 	}
 }
 

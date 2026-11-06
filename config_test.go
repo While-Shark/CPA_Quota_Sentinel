@@ -51,10 +51,10 @@ func TestProbeOnProvisionalRosterIsExplicitRiskOption(t *testing.T) {
 	}
 }
 
-func TestPluginRegistrationUsesV049SourceVersion(t *testing.T) {
+func TestPluginRegistrationUsesV0410SourceVersion(t *testing.T) {
 	reg := PluginRegistration()
-	if got := reg.Metadata.Version; got != "0.4.9" {
-		t.Fatalf("plugin registration version = %q, want 0.4.9", got)
+	if got := reg.Metadata.Version; got != "0.4.10" {
+		t.Fatalf("plugin registration version = %q, want 0.4.10", got)
 	}
 	if reg.Metadata.Name != "CPA_Quota_Sentinel" {
 		t.Fatalf("plugin registration name = %q, want CPA_Quota_Sentinel", reg.Metadata.Name)
@@ -66,12 +66,12 @@ func TestReleaseVersionMetadataConsistent(t *testing.T) {
 		path string
 		want []string
 	}{
-		{"config.go", []string{`var pluginVersion = "0.4.9"`}},
-		{"Makefile", []string{"VERSION ?= 0.4.9"}},
-		{"CHANGELOG.md", []string{"## [v0.4.9] - 2026-11-02"}},
-		{"CHANGELOG.zh-CN.md", []string{"## [v0.4.9] - 2026-11-02"}},
-		{"README.md", []string{"make package VERSION=0.4.9", "make checksums VERSION=0.4.9", "git tag -a v0.4.9 -m \"v0.4.9\"", "git push origin v0.4.9", "[CHANGELOG.md](CHANGELOG.md)"}},
-		{"README.zh-CN.md", []string{"make package VERSION=0.4.9", "make checksums VERSION=0.4.9", "git tag -a v0.4.9 -m \"v0.4.9\"", "git push origin v0.4.9", "[CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)"}},
+		{"config.go", []string{`var pluginVersion = "0.4.10"`}},
+		{"Makefile", []string{"VERSION ?= 0.4.10"}},
+		{"CHANGELOG.md", []string{"## [v0.4.10] - 2026-11-06"}},
+		{"CHANGELOG.zh-CN.md", []string{"## [v0.4.10] - 2026-11-06"}},
+		{"README.md", []string{"make package VERSION=0.4.10", "make checksums VERSION=0.4.10", "git tag -a v0.4.10 -m \"v0.4.10\"", "git push origin v0.4.10", "[CHANGELOG.md](CHANGELOG.md)"}},
+		{"README.zh-CN.md", []string{"make package VERSION=0.4.10", "make checksums VERSION=0.4.10", "git tag -a v0.4.10 -m \"v0.4.10\"", "git push origin v0.4.10", "[CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)"}},
 	} {
 		contents, err := os.ReadFile(check.path)
 		if err != nil {

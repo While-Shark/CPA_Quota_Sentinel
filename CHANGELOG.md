@@ -8,6 +8,14 @@ Earlier releases (v0.1.0 – v0.2.1) predate this file; see the
 [GitHub releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 page for them.
 
+## [v0.4.10] - 2026-11-06
+
+### Fixed
+- Fixed Codex OAuth accounts with only a weekly/monthly quota being incorrectly interpreted as having a five-hour quota in streaming events or response headers.
+- Classify quota windows by their reported duration rather than primary/secondary position. Unknown durations remain unknown and never fabricate a protection or recovery signal.
+- Clear stale five-hour cache entries when a long-only primary window is positively identified; the account UI and quota provider now expose only actual windows.
+- Added regression coverage for weekly-only, monthly-only, dual-window, missing-duration, and protection-threshold cases.
+
 ## [v0.4.9] - 2026-11-02
 
 ### Added

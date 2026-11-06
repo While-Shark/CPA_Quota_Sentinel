@@ -239,7 +239,7 @@ func (h *sequenceProbeHost) SaveAuth(string, json.RawMessage) error { return nil
 func (h *sequenceProbeHost) ResetRoutingCooldown(string) (pluginapi.HostRoutingResetCooldownResponse, error) {
 	return pluginapi.HostRoutingResetCooldownResponse{}, nil
 }
-func (h *sequenceProbeHost) Log(string, string, map[string]any)     {}
+func (h *sequenceProbeHost) Log(string, string, map[string]any) {}
 func (h *sequenceProbeHost) Do(req pluginapi.HTTPRequest) (pluginapi.HTTPResponse, error) {
 	h.mu.Lock()
 	started, release, after := h.doStarted, h.releaseDo, h.afterDo
@@ -3624,6 +3624,7 @@ func TestProductionProbeStrictAuthorizationUsesCurrentWindowEvidence(t *testing.
 		baselineLength time.Duration
 		reset          time.Time
 		payload        string
+		retired        bool // Unknown/unrecognized windows cannot retain probe authority.
 	}{
 		{
 			name:           "changed explicit duration",
@@ -3632,6 +3633,7 @@ func TestProductionProbeStrictAuthorizationUsesCurrentWindowEvidence(t *testing.
 			baselineLength: 5 * time.Hour,
 			reset:          now.Add(5 * time.Hour),
 			payload:        fmt.Sprintf(`{"rate_limit":{"primary_window":{"used_percent":0,"limit_window_seconds":21600,"reset_at":%q}}}`, now.Add(5*time.Hour).Format(time.RFC3339)),
+			retired:        true,
 		},
 		{
 			name:           "current monthly duration missing",
@@ -3640,6 +3642,7 @@ func TestProductionProbeStrictAuthorizationUsesCurrentWindowEvidence(t *testing.
 			baselineLength: 30 * 24 * time.Hour,
 			reset:          now.Add(30 * 24 * time.Hour),
 			payload:        fmt.Sprintf(`{"rate_limit":{"primary_window":{"used_percent":1,"limit_window_seconds":18000,"reset_at":%q},"secondary_window":{"used_percent":0,"reset_at":%q}}}`, now.Add(4*time.Hour).Format(time.RFC3339), now.Add(30*24*time.Hour).Format(time.RFC3339)),
+			retired:        true,
 		},
 		{
 			name:           "changed long-window kind",
@@ -3675,6 +3678,12 @@ func TestProductionProbeStrictAuthorizationUsesCurrentWindowEvidence(t *testing.
 				t.Fatalf("stale baseline authorized %d compact POSTs; urls=%v", posts, urls)
 			}
 			window, ok := r.probeController.Window(binding.Instance, tt.kind)
+			if tt.retired {
+				if ok {
+					t.Fatalf("unrecognized/missing quota window retained stale probe: %#v", window)
+				}
+				return
+			}
 			if !ok || window.State != ProbeWaitingReset || !window.Deadline.Equal(now.Add(30*time.Minute)) {
 				t.Fatalf("strict rejection did not bound read-only reschedule: %#v, ok=%v", window, ok)
 			}

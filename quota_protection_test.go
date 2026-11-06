@@ -65,7 +65,7 @@ func TestProtectionOwnsMarkerAndRecoversFreshQuota(t *testing.T) {
 	if record.OwnerToken == "" || !record.DisableApplied || !record.Fingerprint.ValidHashes() {
 		t.Fatalf("missing ownership: %#v", record)
 	}
-	host.httpBody = []byte(`{"rate_limit":{"primary_window":{"used_percent":70},"secondary_window":{"used_percent":70}}}`)
+	host.httpBody = []byte(`{"rate_limit":{"primary_window":{"used_percent":70,"limit_window_seconds":18000},"secondary_window":{"used_percent":70,"limit_window_seconds":604800}}}`)
 	protectionDue(t, r, "idx-team")
 	if err := r.RecoverQuotaProtectionAccounts(context.Background()); err != nil {
 		t.Fatal(err)

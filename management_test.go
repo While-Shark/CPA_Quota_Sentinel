@@ -288,10 +288,15 @@ func TestManagementStatusExposesNonSensitiveRosterAdmissionDiagnostics(t *testin
 			t.Fatalf("unexpected roster diagnostic key %q in %s", key, resp.Body)
 		}
 	}
-	rawBody := string(resp.Body)
+	// Verify the roster section, not unrelated provider account metadata:
+	// other tests may have populated the shared multi-provider registry.
+	rosterBody, err := json.Marshal(raw.Roster)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, sensitive := range []string{`"codex-a"`, `"codex-b"`, `"auth_ids"`, `"auth_index"`, `"entries"`, `"instances"`, `"credentials"`, `"path"`} {
-		if strings.Contains(rawBody, sensitive) {
-			t.Fatalf("sensitive roster detail %s leaked in %s", sensitive, resp.Body)
+		if strings.Contains(string(rosterBody), sensitive) {
+			t.Fatalf("sensitive roster detail %s leaked in %s", sensitive, rosterBody)
 		}
 	}
 }
