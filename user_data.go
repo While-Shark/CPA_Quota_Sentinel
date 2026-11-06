@@ -29,6 +29,7 @@ type userDataEnvelope struct {
 	Config        Config                       `json:"config"`
 	Accounts      map[string]AccountAnnotation `json:"accounts,omitempty"`
 	Groups        map[string]GroupAnnotation   `json:"groups,omitempty"`
+	Queue         ManualQueueConfig            `json:"queue"`
 }
 
 func loadUserDataWithMigration(paths SemanticStatePaths, hooks FileHooks, crash CrashHitter) (PluginDiskState, bool, error) {
@@ -241,7 +242,7 @@ func readUserData(path string) (PluginDiskState, bool, error) {
 	if env.SchemaVersion > CurrentUserDataSchema {
 		return PluginDiskState{}, false, fmt.Errorf("%w: %d", ErrUserDataFutureSchema, env.SchemaVersion)
 	}
-	return normalizePluginDiskState(PluginDiskState{Config: env.Config, Accounts: env.Accounts, Groups: env.Groups}), true, nil
+	return normalizePluginDiskState(PluginDiskState{Config: env.Config, Accounts: env.Accounts, Groups: env.Groups, Queue: env.Queue}), true, nil
 }
 
 func writeUserDataAtomic(path string, state PluginDiskState, hooks FileHooks, crash CrashHitter) error {
@@ -256,7 +257,7 @@ func writeUserDataAtomic(path string, state PluginDiskState, hooks FileHooks, cr
 		hooks.ReadFile = defaults.ReadFile
 	}
 	state = normalizePluginDiskState(state)
-	env := userDataEnvelope{CurrentUserDataSchema, state.Config, state.Accounts, state.Groups}
+	env := userDataEnvelope{SchemaVersion: CurrentUserDataSchema, Config: state.Config, Accounts: state.Accounts, Groups: state.Groups, Queue: state.Queue}
 	raw, err := json.MarshalIndent(env, "", "  ")
 	if err != nil {
 		return err

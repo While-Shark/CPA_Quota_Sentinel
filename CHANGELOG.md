@@ -8,6 +8,17 @@ Earlier releases (v0.1.0 – v0.2.1) predate this file; see the
 [GitHub releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 page for them.
 
+## [v0.4.11] - 2026-11-06
+
+### Added
+- New Account Rotation Queue management page with a switchable automatic/manual mode. Automatic scheduling remains the default and unchanged after upgrading.
+- Manual queue supports drag-to-reorder, move to top/up/down, sorting by weight, per-account weights from 1 to 10, and weighted round-robin selection in configured order.
+- Persist queue mode, order, and weights with existing user settings and include them in export/import. Next-account preview never consumes rotation slots.
+
+### Safety and tests
+- Preserve CPA priority tiers, disabled/auth-failed accounts, quota protection, and circuit breakers. If every manual-queue account is unavailable, reject selection instead of delegating to unsafe built-in fallback.
+- Add regression coverage for manual queue APIs, persistence, management UI, weighted/concurrent picks, tiering, and unavailable-account exclusion.
+
 ## [v0.4.10] - 2026-11-06
 
 ### Fixed

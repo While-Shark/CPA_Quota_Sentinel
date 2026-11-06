@@ -28,6 +28,7 @@ type StatusPayload struct {
 	Shell                 bool                   `json:"shell,omitempty"`
 	NextAuthID            string                 `json:"next_auth_id"`
 	MonthlyMode           MonthlyMode            `json:"monthly_mode"`
+	Queue                 ManualQueueConfig      `json:"queue"`
 	HandleEnabled         bool                   `json:"handle_enabled"`
 	LastSelected          string                 `json:"last_selected"`
 	LastReason            string                 `json:"last_reason"`
@@ -250,6 +251,8 @@ func registerManagementWithConfig(cfg Config) pluginapi.ManagementRegistrationRe
 			{Method: http.MethodPost, Path: managementBasePath + "/import", Description: "Import scheduler configuration."},
 			{Method: http.MethodGet, Path: managementBasePath + "/annotations", Description: "Read quota annotations."},
 			{Method: http.MethodPut, Path: managementBasePath + "/annotations", Description: "Replace quota annotations."},
+			{Method: http.MethodGet, Path: managementBasePath + "/queue", Description: "Read scheduling queue mode, order and weights."},
+			{Method: http.MethodPut, Path: managementBasePath + "/queue", Description: "Save manual scheduling queue."},
 			{Method: http.MethodPatch, Path: managementBasePath + "/annotations/account", Description: "Update one account annotation."},
 			{Method: http.MethodPatch, Path: managementBasePath + "/annotations/group", Description: "Update one group annotation."},
 			{Method: http.MethodPost, Path: managementBasePath + "/credentials/resolve", Description: "Resolve an active credential ambiguity."},
@@ -314,6 +317,10 @@ func handleManagementRequest(store *PluginState, req pluginapi.ManagementRequest
 		return handleImportState(store, req.Body, now)
 	case method == http.MethodGet && path == "/annotations":
 		return jsonManagementResponse(http.StatusOK, store.Annotations())
+	case method == http.MethodGet && path == "/queue":
+		return jsonManagementResponse(http.StatusOK, store.Annotations().Queue)
+	case method == http.MethodPut && path == "/queue":
+		return handlePutManualQueue(store, req, now)
 	case method == http.MethodPut && path == "/annotations":
 		return handlePutAnnotations(store, req)
 	case method == http.MethodPatch && path == "/annotations/account":
@@ -727,7 +734,7 @@ func handleImportState(store *PluginState, body []byte, now time.Time) pluginapi
 		wakeConfiguredRefreshers()
 	}
 	currentConfig.Store(state.Config)
-	store.SetAnnotations(AnnotationState{Accounts: state.Accounts, Groups: state.Groups})
+	store.SetAnnotations(AnnotationState{Accounts: state.Accounts, Groups: state.Groups, Queue: state.Queue})
 	store.RecordLog("info", "ui.config_imported", "页面导入插件配置", nil, now)
 	return jsonManagementResponse(http.StatusOK, map[string]bool{"ok": true})
 }
@@ -749,6 +756,7 @@ func buildStatusPayload(snapshot StateSnapshot, ordered []ScheduledAccount, life
 		ManagementPath:        configuredManagementPath(snapshot.Config),
 		GeneratedAt:           snapshot.Now,
 		MonthlyMode:           snapshot.Config.MonthlyMode,
+		Queue:                 cloneManualQueue(snapshot.Annotations.Queue),
 		HandleEnabled:         snapshot.Config.HandleEnabled,
 		LastSelected:          snapshot.LastSelected,
 		LastReason:            snapshot.LastReason,
@@ -771,6 +779,9 @@ func buildStatusPayload(snapshot StateSnapshot, ordered []ScheduledAccount, life
 		payload.RefreshState = "sleeping"
 	}
 	payload.NextAuthID = nextStatusAuthID(ordered)
+	if payload.Queue.Mode == QueueModeManual {
+		payload.NextAuthID = nextManualStatusAuthID(snapshot, ordered)
+	}
 	for id, group := range snapshot.Annotations.Groups {
 		payload.Groups = append(payload.Groups, StatusGroup{
 			ID:    id,
@@ -1166,6 +1177,7 @@ func BuildStatusShellPayload(now time.Time) StatusPayload {
 		GeneratedAt:    now,
 		Shell:          true,
 		MonthlyMode:    cfg.MonthlyMode,
+		Queue:          normalizeManualQueue(ManualQueueConfig{}),
 		HandleEnabled:  cfg.HandleEnabled,
 		Settings:       SettingsFromConfig(cfg),
 		EmptyState: EmptyStatePayload{
@@ -1220,6 +1232,7 @@ func handlePublicStatusDataRequest(store *PluginState, now time.Time) pluginapi.
 
 func sanitizePublicStatusPayload(payload StatusPayload) StatusPayload {
 	payload.Shell = false
+	payload.Queue = ManualQueueConfig{Mode: QueueModeAuto}
 	payload.Settings.QuotaEndpoint = ""
 	for i := range payload.Accounts {
 		payload.Accounts[i].LastError = sanitizeResetProbeError(payload.Accounts[i].LastError)
@@ -1459,6 +1472,7 @@ func persistAnnotationState(store *PluginState, state AnnotationState) error {
 	disk := diskStateFromStore(store)
 	disk.Accounts = state.Accounts
 	disk.Groups = state.Groups
+	disk.Queue = state.Queue
 	return SaveUserData(semanticStatePaths(defaultStatePath()).UserData, disk)
 }
 

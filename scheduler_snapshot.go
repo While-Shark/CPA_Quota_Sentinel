@@ -11,17 +11,19 @@ import (
 )
 
 type SchedulerSnapshot struct {
-	HandleEnabled     bool
+	HandleEnabled          bool
 	QuotaProtectionEnabled bool
-	Fallback          FallbackMode
-	MonthlyMode       MonthlyMode
-	Accounts          []AccountView
-	ActiveHighestTier map[string]struct{}
-	Trials            *TrialRegistry
-	EvidenceIntents   chan<- EvidenceIntent
-	AdmissionVersion  uint64
-	Activity          func(pluginapi.SchedulerPickRequest, uint64, time.Time)
-	Observation       func(pluginapi.SchedulerPickRequest, PickDecision, time.Time)
+	Fallback               FallbackMode
+	MonthlyMode            MonthlyMode
+	Queue                  ManualQueueConfig
+	Rotation               *ManualQueueRotation
+	Accounts               []AccountView
+	ActiveHighestTier      map[string]struct{}
+	Trials                 *TrialRegistry
+	EvidenceIntents        chan<- EvidenceIntent
+	AdmissionVersion       uint64
+	Activity               func(pluginapi.SchedulerPickRequest, uint64, time.Time)
+	Observation            func(pluginapi.SchedulerPickRequest, PickDecision, time.Time)
 }
 
 type EvidenceIntent struct {
@@ -41,6 +43,7 @@ func PublishSchedulerSnapshot(snapshot *SchedulerSnapshot) {
 }
 func cloneSchedulerSnapshot(s SchedulerSnapshot) SchedulerSnapshot {
 	s.Accounts = append([]AccountView(nil), s.Accounts...)
+	s.Queue = cloneManualQueue(s.Queue)
 	s.ActiveHighestTier = cloneStringSet(s.ActiveHighestTier)
 	return s
 }
@@ -68,7 +71,7 @@ func schedulerPickPublished(req pluginapi.SchedulerPickRequest, now time.Time) P
 	}
 	candidates := make([]Candidate, 0, len(req.Candidates))
 	for _, c := range req.Candidates {
-		candidates = append(candidates, Candidate{ID: c.ID, Provider: c.Provider})
+		candidates = append(candidates, Candidate{ID: c.ID, Provider: c.Provider, Status: c.Status})
 	}
 	result := selectAccountSkipping(*snapshot, candidates, now, nil, snapshot.Trials)
 	var skipped map[AuthInstanceID]struct{}
@@ -91,13 +94,20 @@ func schedulerPickPublished(req pluginapi.SchedulerPickRequest, now time.Time) P
 	}
 	if snapshot.QuotaProtectionEnabled {
 		for _, account := range snapshot.Accounts {
-		if !account.QuotaProtectionPaused { continue }
-		for _, candidate := range candidates {
-			if candidate.ID == account.ID && candidate.Provider == "codex" {
-			return observeSchedulerDecision(snapshot, req, PickDecision{Handled: true, Reject: true, Reason: "quota_protection"}, now)
+			if !account.QuotaProtectionPaused {
+				continue
+			}
+			for _, candidate := range candidates {
+				if candidate.ID == account.ID && candidate.Provider == "codex" {
+					return observeSchedulerDecision(snapshot, req, PickDecision{Handled: true, Reject: true, Reason: "quota_protection"}, now)
+				}
 			}
 		}
-		}
+	}
+	if snapshot.Queue.Mode == QueueModeManual {
+		// Never bypass a user-managed queue by delegating to CPA's default
+		// picker: it could choose an auth deliberately excluded for safety.
+		return observeSchedulerDecision(snapshot, req, PickDecision{Handled: true, Reject: true, Reason: "manual_queue_unavailable"}, now)
 	}
 	if snapshot.Fallback == FallbackFillFirst {
 		return observeSchedulerDecision(snapshot, req, PickDecision{Handled: true, DelegateBuiltin: pluginapi.SchedulerBuiltinFillFirst, Reason: result.Reason, UnavailableSummary: fallbackUnavailableSummary(*snapshot, candidates, now)}, now)
@@ -179,7 +189,7 @@ func schedulerSnapshotFromState(state StateSnapshot, trials *TrialRegistry) *Sch
 		activity = pump.enqueue
 		observation = pump.enqueueObservation
 	}
-	return &SchedulerSnapshot{HandleEnabled: state.Config.HandleEnabled, QuotaProtectionEnabled: state.Config.QuotaProtectionEnabled, Fallback: state.Config.Fallback, MonthlyMode: state.Config.MonthlyMode, Accounts: accounts, ActiveHighestTier: active, Trials: trials, EvidenceIntents: globalEvidenceIntents, Activity: activity, Observation: observation}
+	return &SchedulerSnapshot{HandleEnabled: state.Config.HandleEnabled, QuotaProtectionEnabled: state.Config.QuotaProtectionEnabled, Fallback: state.Config.Fallback, MonthlyMode: state.Config.MonthlyMode, Queue: cloneManualQueue(state.Annotations.Queue), Rotation: state.QueueRotation, Accounts: accounts, ActiveHighestTier: active, Trials: trials, EvidenceIntents: globalEvidenceIntents, Activity: activity, Observation: observation}
 }
 
 func accountViewFromState(a AccountState, cfg Config, now time.Time, trials *TrialRegistry) AccountView {
@@ -208,9 +218,9 @@ func accountViewFromState(a AccountState, cfg Config, now time.Time, trials *Tri
 		PluginPriority: a.Annotation.SchedulerPriority, CPAPriority: a.Priority, Family: a.Family,
 		Cache: cache, LastKnownAvailable: a.LastError == "", Exhausted: exhausted,
 		ResetAt: reset, AuthBlocked: a.Refresh.AuthFailure, Circuit: circuitClass,
-		TemporaryUnavailable: a.TemporaryExhausted && a.TemporaryResetAt.After(now),
+		TemporaryUnavailable:  a.TemporaryExhausted && a.TemporaryResetAt.After(now),
 		QuotaProtectionPaused: a.QuotaProtectionPaused || quotaNeedsProtectionPause(a.Quota, cfg),
-		Trial:                trial, Expiry: accountSortTime(a), RemainingQuota: remainingQuota(a), QuotaPressure: quotaPressure(a, now),
+		Trial:                 trial, Expiry: accountSortTime(a), RemainingQuota: remainingQuota(a), QuotaPressure: quotaPressure(a, now),
 	}
 }
 

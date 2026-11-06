@@ -11,6 +11,7 @@ type PluginDiskState struct {
 	Config   Config                       `json:"config"`
 	Accounts map[string]AccountAnnotation `json:"accounts,omitempty"`
 	Groups   map[string]GroupAnnotation   `json:"groups,omitempty"`
+	Queue    ManualQueueConfig            `json:"queue"`
 }
 
 // PersistentState is deliberately separate from PluginDiskState: the former
@@ -83,10 +84,12 @@ func normalizePluginDiskState(state PluginDiskState) PluginDiskState {
 	annotations := NormalizeAnnotationState(AnnotationState{
 		Accounts: state.Accounts,
 		Groups:   state.Groups,
+		Queue:    state.Queue,
 	})
 	state.Config = cfg
 	state.Accounts = annotations.Accounts
 	state.Groups = annotations.Groups
+	state.Queue = annotations.Queue
 	return state
 }
 
@@ -99,5 +102,6 @@ func diskStateFromStore(store *PluginState) PluginDiskState {
 		Config:   store.Config(),
 		Accounts: annotations.Accounts,
 		Groups:   annotations.Groups,
+		Queue:    annotations.Queue,
 	}
 }

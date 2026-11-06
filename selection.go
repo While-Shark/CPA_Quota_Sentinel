@@ -39,27 +39,27 @@ const (
 )
 
 type AccountView struct {
-	ID                   string
-	AuthIndex            string
-	Instance             AuthInstanceID
-	PluginPriority       int
-	CPAPriority          int
-	Family               AccountFamily
-	Cache                CacheClass
-	LastKnownAvailable   bool
-	Exhausted            bool
-	ResetAt              time.Time
-	AuthBlocked          bool
-	Circuit              CircuitClass
-	TemporaryUnavailable bool
+	ID                    string
+	AuthIndex             string
+	Instance              AuthInstanceID
+	PluginPriority        int
+	CPAPriority           int
+	Family                AccountFamily
+	Cache                 CacheClass
+	LastKnownAvailable    bool
+	Exhausted             bool
+	ResetAt               time.Time
+	AuthBlocked           bool
+	Circuit               CircuitClass
+	TemporaryUnavailable  bool
 	QuotaProtectionPaused bool
-	Trial                TrialState
-	Expiry               time.Time
-	RemainingQuota       float64
-	QuotaPressure        float64
+	Trial                 TrialState
+	Expiry                time.Time
+	RemainingQuota        float64
+	QuotaPressure         float64
 }
 
-type Candidate struct{ ID, Provider string }
+type Candidate struct{ ID, Provider, Status string }
 
 type SelectionResult struct {
 	AuthID         string
@@ -96,6 +96,9 @@ func SelectAccount(snapshot SchedulerSnapshot, candidates []Candidate, now time.
 }
 
 func selectAccountSkipping(snapshot SchedulerSnapshot, candidates []Candidate, now time.Time, skip map[AuthInstanceID]struct{}, trials *TrialRegistry) SelectionResult {
+	if snapshot.Queue.Mode == QueueModeManual {
+		return selectManualAccount(snapshot, candidates, now, skip, trials, true)
+	}
 	eligible := make(map[string]struct{}, len(candidates))
 	for _, c := range candidates {
 		if c.ID != "" && c.Provider == "codex" {

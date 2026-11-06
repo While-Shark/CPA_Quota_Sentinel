@@ -117,7 +117,7 @@ func configure(raw []byte) error {
 	}
 	currentConfig.Store(cfg)
 	globalState.ReplaceConfig(cfg)
-	globalState.SetAnnotations(AnnotationState{Accounts: disk.Accounts, Groups: disk.Groups})
+	globalState.SetAnnotations(AnnotationState{Accounts: disk.Accounts, Groups: disk.Groups, Queue: disk.Queue})
 	startEvidenceConsumer()
 	publishSchedulerState(globalState, nil, time.Now())
 	return nil

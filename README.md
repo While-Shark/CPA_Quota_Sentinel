@@ -25,6 +25,7 @@ The CPA plugin ID and library filename are `cpa-quota-sentinel`.
 - Persistent pause evidence, credential fingerprints and ownership markers for managed auth disabling.
 - Custom management paths, account protection status, logs and policy JSON export.
 - A live scheduling-settings policy panel with a shared pause-threshold slider, optional per-window thresholds, recovery slider, polling presets, automatic recovery switch and save/apply action.
+- A switchable **Account rotation queue** page: automatic scheduling remains the default; manual mode supports drag-to-reorder, move to top, and per-account weights (1–10) for weighted round-robin selection.
 - English and Simplified Chinese documentation and management UI.
 
 **Protection is opt-in:** turn on **Low quota protection** in the plugin's scheduling settings and save.
@@ -313,7 +314,7 @@ Keep this setting disabled unless you understand and accept that risk.
 
 CPA's Plugin Store reads plugin catalogs from `registry.json` sources and downloads release archives from GitHub Releases.
 
-1. Publish a GitHub Release tag (for example `v0.4.10`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
+1. Publish a GitHub Release tag (for example `v0.4.11`) in your repository so GitHub Actions builds the platform `.zip` archives and `checksums.txt`.
 2. Add this repository's `registry.json` to `plugins.store-sources` in CPA's `config.yaml`:
 
 ```yaml
@@ -543,8 +544,8 @@ make build
 Build release archives and checksums:
 
 ```bash
-make package VERSION=0.4.10
-make checksums VERSION=0.4.10
+make package VERSION=0.4.11
+make checksums VERSION=0.4.11
 ```
 
 Windows users can build `dist/cpa-quota-sentinel.dll` with:
@@ -563,8 +564,8 @@ Before tagging, record the release in `CHANGELOG.md` and bump the version
 strings in `config.go`, `Makefile`, and both READMEs.
 
 ```bash
-git tag -a v0.4.10 -m "v0.4.10"
-git push origin v0.4.10
+git tag -a v0.4.11 -m "v0.4.11"
+git push origin v0.4.11
 ```
 
 Release archives use this naming scheme:
