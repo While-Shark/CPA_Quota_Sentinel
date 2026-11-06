@@ -122,6 +122,8 @@ func pickProviderAccount(req pluginapi.SchedulerPickRequest, now time.Time) Pick
 	}
 
 	cfg := globalState.Config()
+	queue := globalState.Annotations().Queue
+	manualMode := queue.Mode == QueueModeManual
 	if !cfg.HandleEnabled {
 		return PickDecision{Reason: "scheduler_disabled"}
 	}
@@ -133,6 +135,17 @@ func pickProviderAccount(req pluginapi.SchedulerPickRequest, now time.Time) Pick
 		acc, exists := globalMultiProviderRegistry.Get(c.ID)
 		if exists && acc.Disabled {
 			continue
+		}
+		if manualMode {
+			// Automatic mode is intentionally unchanged from v0.4.11.
+			switch strings.ToLower(strings.TrimSpace(c.Status)) {
+			case "disabled", "unavailable", "blocked", "expired":
+				continue
+			}
+			// CPA weight zero excludes a credential from manual routing.
+			if observedUpstreamWeights.WeightForCandidate(c).Weight <= 0 {
+				continue
+			}
 		}
 		hadValidCandidates = true
 
@@ -162,6 +175,9 @@ func pickProviderAccount(req pluginapi.SchedulerPickRequest, now time.Time) Pick
 				Reason:  "quota_protection",
 			}
 		}
+		if manualMode {
+			return PickDecision{Handled: true, Reject: true, Reason: "manual_queue_unavailable"}
+		}
 		return PickDecision{Reason: "no_eligible_candidates"}
 	}
 
@@ -178,6 +194,29 @@ func pickProviderAccount(req pluginapi.SchedulerPickRequest, now time.Time) Pick
 		if c.Priority == bestPriority {
 			topTier = append(topTier, c)
 		}
+	}
+
+	// Manual mode follows configured order and CPA's *upstream* credential
+	// weights. Distinct provider/model requests have independent cursors.
+	if manualMode {
+		ids := make([]string, 0, len(topTier))
+		candidates := make(map[string]pluginapi.SchedulerAuthCandidate, len(topTier))
+		allowed := make(map[string]AccountView, len(topTier))
+		for _, candidate := range topTier {
+			ids = append(ids, candidate.ID)
+			candidates[candidate.ID] = candidate
+			allowed[candidate.ID] = AccountView{ID: candidate.ID}
+		}
+		entries := weightedEntriesFromCandidates(effectiveManualQueue(queue, ids), candidates)
+		provider := req.Provider
+		if provider == "" && len(topTier) > 0 {
+			provider = topTier[0].Provider
+		}
+		rotation := globalState.providerRotations.For(provider, req.Model)
+		if selected, ok := rotation.Choose(entries, allowed, true); ok {
+			return PickDecision{AuthID: selected.ID, Handled: true, Reason: "selected"}
+		}
+		return PickDecision{Handled: true, Reject: true, Reason: "manual_queue_unavailable"}
 	}
 
 	idx := atomic.AddUint64(&providerRoundRobinCounter, 1) % uint64(len(topTier))

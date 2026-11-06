@@ -150,7 +150,19 @@ func handleSchedulerPick(raw []byte) ([]byte, error) {
 			return nil, err
 		}
 	}
-	if !requestIncludesCodex(req) {
+	observedUpstreamWeights.ObserveCandidates(req.Candidates)
+	// Candidate sets are authoritative for manual routes. Keep the original
+	// automatic dispatch unchanged if Codex is among the configured providers.
+	providerOnlyManual := globalState.Annotations().Queue.Mode == QueueModeManual && req.Provider != "codex" && len(req.Candidates) > 0
+	if providerOnlyManual {
+		for _, candidate := range req.Candidates {
+			if candidate.Provider == "codex" {
+				providerOnlyManual = false
+				break
+			}
+		}
+	}
+	if !requestIncludesCodex(req) || providerOnlyManual {
 		decision := pickProviderAccount(req, time.Now())
 		return okEnvelope(pluginapi.SchedulerPickResponse{
 			AuthID:       decision.AuthID,

@@ -317,6 +317,26 @@ code,.mono,.number{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation 
 .queue-move button{min-width:29px;min-height:31px;padding:3px 7px}
 @media(max-width:850px){.queue-account{flex-wrap:wrap}.queue-account-info{flex-basis:55%}.queue-availability{margin-left:auto}.queue-weight{margin-left:40px}.queue-list-heading .toolbar-actions{width:100%}}
 @media(max-width:540px){.queue-settings{padding:18px}.queue-list{padding:10px}.queue-account{gap:7px;padding:10px}.queue-account-info{flex:1 1 58%}.queue-weight{margin-left:0}.queue-move{margin-left:auto}.queue-list-heading{padding:16px}}
+
+.queue-account-title{display:flex;align-items:center;gap:6px;min-width:0}
+.queue-account-title strong{max-width:240px}
+.queue-account-title .pill{flex:none}
+.queue-quotas{display:flex;align-items:flex-start;justify-content:flex-start;gap:9px;min-width:270px;max-width:46%;flex:1 1 330px}
+.queue-quota-group{min-width:80px;flex:1 1 90px;display:grid;align-content:center;gap:4px;border:1px solid var(--line);background:var(--surface-subtle);padding:7px 9px;border-radius:8px}
+.queue-quota-title{font-size:10px;color:var(--muted)}
+.queue-quota-values{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.queue-quota-value{display:inline-flex;align-items:center;gap:4px;max-width:100%;white-space:nowrap}
+.queue-quota-value small{font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.queue-quota-value strong{color:var(--success);font-variant-numeric:tabular-nums;font-size:12px}
+.queue-quota-group em{font-style:normal;font-size:11px;color:var(--muted)}
+.queue-upstream-weight{display:grid;justify-items:center;gap:2px;min-width:78px;color:var(--ink)}
+.queue-upstream-weight span{font-size:10px;color:var(--muted)}
+.queue-upstream-weight strong{font-size:14px;font-variant-numeric:tabular-nums}
+.queue-upstream-weight small{font-size:9px;color:var(--muted)}
+.queue-weight-warning{padding:0 17px;color:var(--warning,#b45309)}
+.queue-account-info{flex:1 1 150px}
+@media(max-width:1250px){.queue-quotas{order:4;max-width:none;flex:1 1 100%;margin-left:45px}.queue-move{margin-left:auto}}
+@media(max-width:540px){.queue-quotas{margin-left:0;gap:5px}.queue-account-info{flex-basis:58%}.queue-account-title strong{max-width:170px}.queue-quota-group{padding:5px}.queue-quota-value small{max-width:78px}}
 </style>
 </head>
 <body>
@@ -421,6 +441,7 @@ const state={
  rosterTitle:'',rosterBody:'',
  settingsSaved:null,settingsDraft:null,settingsDirty:false,
  queueSaved:null,queueDraft:null,queueDirty:false,dragQueueId:'',
+ upstreamWeights:{},upstreamWeightWarning:'',upstreamWeightsLoaded:false,
  retrySaved:null,retryDraft:null,retryDirty:false,
  retryRuntime:{mode:'off',requests:0,retries:0,succeeded:0,failed:0,shadow_hits:0,events:[]},
  catalog:{providers:[],models:[],loaded:false},catalogNote:'',
@@ -463,7 +484,7 @@ async function copyTextWithFallback(value){
 }
 function safeDownload(name,text){const blob=new Blob([text],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 /* ---- adapters: API <-> view model ---- */
-function normalizeStatus(raw){raw=raw||{};if(raw.management_path||(raw.settings||{}).management_path)STATUS.management_path=raw.management_path||raw.settings.management_path;state.accounts=Array.isArray(raw.accounts)?raw.accounts:[];state.logs=Array.isArray(raw.logs)?raw.logs:[];state.nextId=raw.next_auth_id||'';state.lastSelected=raw.last_selected||'';state.monthlyMode=raw.monthly_mode||'expiry_order';const roster=raw.roster||{};const messages=[roster.warning,roster.risk_warning].filter(Boolean);state.rosterTitle=[roster.capability,roster.health].filter(Boolean).join(' / ')||'Roster lifecycle';state.rosterBody=messages.join(' ');state.queueSaved=queueFromAPI(raw.queue);if(!state.queueDirty)state.queueDraft=queueAddAccounts(clone(state.queueSaved));}
+function normalizeStatus(raw){raw=raw||{};if(raw.management_path||(raw.settings||{}).management_path)STATUS.management_path=raw.management_path||raw.settings.management_path;state.accounts=Array.isArray(raw.accounts)?raw.accounts:[];if(Array.isArray(raw.provider_accounts))state.providerAccounts=raw.provider_accounts;state.logs=Array.isArray(raw.logs)?raw.logs:[];state.nextId=raw.next_auth_id||'';state.lastSelected=raw.last_selected||'';state.monthlyMode=raw.monthly_mode||'expiry_order';const roster=raw.roster||{};const messages=[roster.warning,roster.risk_warning].filter(Boolean);state.rosterTitle=[roster.capability,roster.health].filter(Boolean).join(' / ')||'Roster lifecycle';state.rosterBody=messages.join(' ');state.queueSaved=queueFromAPI(raw.queue);if(!state.queueDirty)state.queueDraft=queueAddAccounts(clone(state.queueSaved));}
 const SETTING_MAP=[
  ['scheduler_enabled','handle_enabled','toggle'],['fallback_lower_priority','schedule_across_priorities','toggle'],
  ['monthly_mode','monthly_mode','radio'],['refresh_interval','quota_refresh_interval','duration'],
@@ -624,9 +645,56 @@ function queueFromAPI(raw){
  const entries=(Array.isArray(raw.entries)?raw.entries:[]).filter(item=>item&&typeof item.auth_id==='string').map(item=>({auth_id:item.auth_id,weight:Number(item.weight)})).filter(item=>{if(!item.auth_id||seen.has(item.auth_id))return false;seen.add(item.auth_id);return true});
  return {mode,entries};
 }
+
+function queueVisibleAccounts(){
+ const map=new Map();
+ for(const a of state.accounts){if(a&&a.auth_id)map.set(a.auth_id,{...a,provider:'codex'})}
+ for(const a of state.providerAccounts){if(a&&a.auth_id&&!map.has(a.auth_id))map.set(a.auth_id,a)}
+ return Array.from(map.values());
+}
+function queueUpstreamWeight(authID){
+ const source=state.upstreamWeights||{},w=source[authID];
+ if(w&&Number.isSafeInteger(Number(w.weight))&&Number(w.weight)>=0&&Number(w.weight)<=1000000){
+  return {weight:Number(w.weight),source:String(w.source||'unknown')};
+ }
+ return {weight:null,source:'unknown'};
+}
+function queueWeightLabel(authID){
+ const w=queueUpstreamWeight(authID),unknown=w.weight===null;
+ const value=unknown?'—':String(w.weight);
+ const source=w.source==='candidate'?tr('运行时','Runtime'):w.source==='auth_file'?tr('认证文件','Auth file'):w.source==='default'?tr('上游默认','CPA default'):w.source==='invalid'?tr('权重无效','Invalid weight'):tr('未同步','Not synced');
+ return `<div class="queue-upstream-weight" title="${E(source)}"><span>${tr('CPA 权重','CPA weight')}</span><strong>${value}</strong><small>${E(source)}</small></div>`;
+}
+function queueQuotaItems(a){
+ if(!a)return [];
+ if(a.provider==='codex'){
+  const windows=[];
+  const five=a.five_hour,long=a.long_window;
+  if(five&&!five.missing&&five.has_usage_percent!==false)windows.push({name:'5h',value:Number(five.remaining_percent),kind:'short'});
+  if(long&&!long.missing&&long.has_usage_percent!==false)windows.push({name:long.kind==='monthly'?tr('月额度','Monthly quota'):long.kind==='weekly'?tr('周额度','Weekly quota'):tr('周/月','Week/month'),value:Number(long.remaining_percent),kind:'long'});
+  return windows;
+ }
+ return (Array.isArray(a.windows)?a.windows:[]).filter(w=>w&&w.remaining_percent!==null&&w.remaining_percent!==undefined).map(w=>{
+  const title=String(w.name||''),identifier=String(w.bucket_id||'');
+  const label=w.group?providerGroupLabel(w.group)+' · '+title:title;
+  let kind='other';
+  if(/5h|five.?hour|5\s*小时/i.test(title+' '+identifier))kind='short';
+  else if(/week|weekly|7d|周|month|monthly|30d|月/i.test(title+' '+identifier))kind='long';
+  return {name:label||tr('其他额度','Other quota'),kind,value:Number(w.remaining_percent)};
+ }).filter(w=>Number.isFinite(w.value));
+}
+function queueQuotaMarkup(a){
+ const items=queueQuotaItems(a);
+ const short=items.filter(x=>x.kind==='short'),long=items.filter(x=>x.kind==='long'),extra=items.filter(x=>x.kind==='other');
+ function slot(label,values){
+  return `<div class="queue-quota-group"><span class="queue-quota-title">${E(label)}</span><div class="queue-quota-values">${values.length?values.map(v=>`<span class="queue-quota-value" title="${E(v.name)}">${values.length>1?`<small>${E(v.name)}</small>`:''}<strong>${Math.round(v.value*10)/10}%</strong></span>`).join(''):`<em>${tr('未提供','Unknown')}</em>`}</div></div>`;
+ }
+ return `<div class="queue-quotas">${slot(tr('5 小时','5 hours'),short)}${slot(tr('周 / 月','Week / month'),long)}${extra.length?slot(tr('其他 / 模型组','Other / pools'),extra):''}</div>`;
+}
+
 function queueAddAccounts(queue){
  const out=clone(queue),seen=new Set(out.entries.map(entry=>entry.auth_id));
- for(const account of state.accounts){if(!account.auth_id||seen.has(account.auth_id))continue;seen.add(account.auth_id);out.entries.push({auth_id:account.auth_id,weight:1})}
+ for(const account of queueVisibleAccounts()){if(!account.auth_id||seen.has(account.auth_id))continue;seen.add(account.auth_id);out.entries.push({auth_id:account.auth_id,weight:1})}
  return out;
 }
 function validateQueue(queue){
@@ -645,15 +713,16 @@ function queueMove(from,to){
 }
 function renderQueue(){
  const q=state.queueDraft||queueAddAccounts(queueFromAPI({}));
- const manual=q.mode==='manual',accountById=new Map(state.accounts.map(a=>[a.auth_id,a]));
+ const manual=q.mode==='manual',accountById=new Map(queueVisibleAccounts().map(a=>[a.auth_id,a]));
  const rows=q.entries.map((item,i)=>{
-  const a=accountById.get(item.auth_id),available=!!(a&&a.available&&!a.quota_protection_paused);
+  const a=accountById.get(item.auth_id),upstream=queueUpstreamWeight(item.auth_id),available=!!(a&&upstream.weight!==0&&(a.provider==='codex'?a.available&&!a.quota_protection_paused:!a.disabled&&!a.paused));
   return `<li class="queue-account ${available?'':'queue-account-unavailable'}" data-queue-row="${E(item.auth_id)}">
    <div class="queue-grip" draggable="true" data-queue-drag="${E(item.auth_id)}" title="${tr('拖动调整顺序','Drag to reorder')}">☷</div>
    <span class="queue-order">${i+1}</span>
-   <div class="queue-account-info"><strong>${E(a&&(a.alias||a.auth_id)||item.auth_id)}</strong><span class="mono">${E(item.auth_id)}</span></div>
+   <div class="queue-account-info"><div class="queue-account-title"><strong>${E(a&&(a.alias||a.auth_id)||item.auth_id)}</strong>${pill(E(a&&a.provider||tr('未知','Unknown')),'blue')}</div><span class="mono">${E(item.auth_id)}</span></div>
+   ${queueQuotaMarkup(a)}
    <span class="queue-availability">${available?pill(tr('可用','Available'),'green'):pill(a?tr('暂不可用','Unavailable'):tr('账号未加载','Not loaded'),'grey')}</span>
-   <label class="queue-weight"><span>${tr('权重','Weight')}</span><input class="input" type="number" min="1" max="10" step="1" data-queue-weight="${E(item.auth_id)}" value="${E(item.weight)}"></label>
+   ${queueWeightLabel(item.auth_id)}
    <div class="queue-move"><button class="btn btn-sm" type="button" data-action="queue-top" data-index="${i}" ${i===0?'disabled':''} title="${tr('置顶','To top')}">⇧</button><button class="btn btn-sm" type="button" data-action="queue-up" data-index="${i}" ${i===0?'disabled':''} title="${tr('上移','Move up')}">↑</button><button class="btn btn-sm" type="button" data-action="queue-down" data-index="${i}" ${i===q.entries.length-1?'disabled':''} title="${tr('下移','Move down')}">↓</button></div>
   </li>`;
  }).join('');
@@ -662,11 +731,12 @@ function renderQueue(){
  <section class="panel queue-settings">
   <div class="panel-title"><div><h2>${tr('调度模式','Scheduling mode')}</h2><p>${tr('默认是现有自动模式，保存之后才改变真实请求路由','Automatic is the default. Routing changes only after you save.')}</p></div>${pill(manual?tr('自定义队列','Manual queue'):tr('自动调度','Automatic'),manual?'blue':'green')}</div>
   <div class="segmented" role="group" aria-label="${tr('调度模式','Scheduling mode')}"><button type="button" data-action="queue-mode" data-mode="auto" aria-pressed="${!manual}">${tr('自动模式','Automatic')}</button><button type="button" data-action="queue-mode" data-mode="manual" aria-pressed="${manual}">${tr('自定义队列','Manual queue')}</button></div>
-  <p class="queue-hint">${manual?tr('按顺序加权轮转：权重 3 的账号连续使用 3 次，然后轮到下一账号。','Weighted rotation: weight 3 receives three consecutive requests before the next account.'):tr('保持原有的额度、到期时间和插件优先级自动排序，忽略手动顺序和权重。','Keep quota/expiry/priority ordering. Manual order and weights are ignored.')}</p>
-  <p class="queue-hint">${tr('CPA 高优先级账号仍优先；已停用、额度不足、熔断的账号会被跳过。此处权重仅影响本插件，不修改 CPA 原生账号权重。','CPA priority tiers remain first; disabled, exhausted and circuit-open accounts are skipped. These weights do not change native CPA weights.')}</p>
+  <p class="queue-hint">${manual?tr('按每个模型自己的可用候选账号顺序轮转；上游权重 3 的账号连续使用 3 次，然后轮到下一账号。','Each model rotates its eligible accounts independently. An upstream weight of 3 grants three consecutive picks.'):tr('保持原有自动调度，不使用自定义队列顺序。','Existing automatic scheduling stays unchanged; manual ordering is ignored.')}</p>
+  <p class="queue-hint">${tr('使用 CPA 上游账号权重（未配置默认 1，0 代表不参与路由），这里只管理顺序、不写入上游权重；各提供商和模型的轮转独立。','Reads CPA upstream credential weights (default 1, zero disables weighted routing). Only the order is editable here; each provider/model rotates separately.')}</p>
  </section>
- <section class="panel queue-list-panel"><div class="queue-list-heading"><div><h2>${tr('账号顺序与权重','Account order and weights')} (${q.entries.length})</h2><p>${tr('拖动调整，也可使用置顶、上移、下移按钮','Drag to reorder, or use the buttons.')}</p></div><div class="toolbar-actions">${button('queue-sort-weight',tr('按权重降序','Sort by weight'),'btn-sm')}${button('queue-auto-order',tr('恢复自动排序','Use automatic order'),'btn-sm')}</div></div>
-  <ol class="queue-list">${rows||tr('暂无账号，请先加载 Codex 额度数据','No accounts yet. Load Codex quota data first.')}</ol></section>
+ <section class="panel queue-list-panel"><div class="queue-list-heading"><div><h2>${tr('账号顺序与权重','Account order and weights')} (${q.entries.length})</h2><p>${tr('拖动调整，也可使用置顶、上移、下移按钮','Drag to reorder, or use the buttons.')}</p></div><div class="toolbar-actions">${button('queue-refresh-weights',ic('refresh',13)+tr('读取 CPA 权重','Sync CPA weights'),'btn-sm')}${button('queue-sort-weight',tr('按权重降序','Sort by weight'),'btn-sm')}${button('queue-auto-order',tr('恢复自动排序','Use automatic order'),'btn-sm')}</div></div>
+  ${state.upstreamWeightWarning?`<p class="queue-hint queue-weight-warning">${E(state.upstreamWeightWarning)}</p>`:''}
+  <ol class="queue-list">${rows||tr('暂无认证账号，请先刷新上游 AUTH 清单','No auth accounts yet. Refresh the upstream auth inventory.')}</ol></section>
  <div class="settings-savebar"><div class="dirty-label">${state.queueDirty?`<strong>● ${tr('有未保存的修改','Unsaved changes')}</strong>`:tr('队列已保存','Queue saved')} · ${tr('下一账号','Next account')}: <strong>${E(state.nextId||'—')}</strong></div><div class="toolbar-actions">${button('queue-revert',tr('撤销修改','Discard changes'))}${button('queue-save',ic('check',15)+tr('保存并应用','Save and apply'),'btn-primary')}</div></div>`;
 }
 
@@ -856,8 +926,18 @@ function renderKeepScroll(){
 /* ---- live data flow ---- */
 let statusPollID=null;
 async function refreshSnapshot(){const data=await requestManagement('/status',{query:{format:'json'}});normalizeStatus(data);const apiSettings=data.settings||{};state.settingsSaved=settingsFromAPI(apiSettings);state.retrySaved=retryFromAPI(apiSettings);if(!state.settingsDirty)state.settingsDraft=clone(state.settingsSaved);if(!state.retryDirty)state.retryDraft=clone(state.retrySaved);}
-async function refreshProviderAccounts(probe=false){try{const data=await requestManagement('/provider-accounts',probe?{method:'POST',body:{}}:{});state.providerAccounts=Array.isArray(data.accounts)?data.accounts:[];state.providerError=''}catch(error){state.providerError=error.message||String(error)}}
-async function loadStatus(){await refreshSnapshot();await refreshProviderAccounts();state.loaded=true;state.keyError=false;startStatusPolling();}
+async function refreshProviderAccounts(probe=false){try{const data=await requestManagement('/provider-accounts',probe?{method:'POST',body:{}}:{});state.providerAccounts=Array.isArray(data.accounts)?data.accounts:[];state.providerError='';if(!state.queueDirty&&state.queueSaved)state.queueDraft=queueAddAccounts(clone(state.queueSaved))}catch(error){state.providerError=error.message||String(error)}}
+async function loadQueueWeights(force=false){
+ if(state.upstreamWeightsLoaded&&!force)return;
+ try{
+  const payload=await requestManagement('/queue/weights');
+  state.upstreamWeights=payload&&typeof payload.weights==='object'&&payload.weights?payload.weights:{};
+  state.upstreamWeightWarning=payload.warning||'';
+  state.upstreamWeightsLoaded=true;
+  await refreshSnapshot();
+ }catch(error){state.upstreamWeightWarning=tr('无法读取 CPA 上游权重，请检查管理接口。','Could not read CPA upstream weights. Check management API.')}
+}
+async function loadStatus(){await refreshSnapshot();await refreshProviderAccounts();state.loaded=true;state.keyError=false;if(getRoute()==='queue')await loadQueueWeights();startStatusPolling();}
 async function refreshRetryRuntime(){try{normalizeRetryRuntime(await requestManagement('/retry/status',{query:{format:'json'}}))}catch(error){}}
 function startStatusPolling(){if(statusPollID)return;statusPollID=window.setInterval(async()=>{try{await refreshSnapshot();await refreshRetryRuntime();const focus=document.activeElement;if(focus&&(focus.tagName==='INPUT'||focus.tagName==='SELECT'||focus.tagName==='TEXTAREA')&&document.getElementById('main')&&document.getElementById('main').contains(focus))return;renderKeepScroll()}catch(error){}},15000)}
 async function pollStatus(times,delayMs){for(let i=0;i<times;i++){await new Promise((resolve)=>window.setTimeout(resolve,delayMs));await refreshSnapshot();renderKeepScroll()}}
@@ -894,10 +974,11 @@ document.addEventListener('click',async(ev)=>{
   if(action==='queue-mode'){state.queueDraft.mode=nodeTarget.dataset.mode==='manual'?'manual':'auto';state.queueDirty=true;renderKeepScroll();return}
   if(action==='queue-up'||action==='queue-down'||action==='queue-top'){
    const index=Number(nodeTarget.dataset.index);queueMove(index,action==='queue-top'?0:index+(action==='queue-up'?-1:1));return}
-  if(action==='queue-sort-weight'){state.queueDraft.entries.sort((a,b)=>b.weight-a.weight);state.queueDirty=true;renderKeepScroll();return}
+  if(action==='queue-refresh-weights'){await loadQueueWeights(true);renderKeepScroll();return}
+  if(action==='queue-sort-weight'){await loadQueueWeights();state.queueDraft.entries.sort((a,b)=>(queueUpstreamWeight(b.auth_id).weight??-1)-(queueUpstreamWeight(a.auth_id).weight??-1));state.queueDirty=true;renderKeepScroll();return}
   if(action==='queue-auto-order'){
    const weights=new Map(state.queueDraft.entries.map(entry=>[entry.auth_id,entry.weight]));
-   state.queueDraft.entries=state.accounts.map(a=>({auth_id:a.auth_id,weight:weights.get(a.auth_id)||1}));
+   state.queueDraft.entries=queueVisibleAccounts().map(a=>({auth_id:a.auth_id,weight:weights.get(a.auth_id)||1}));
    state.queueDirty=true;renderKeepScroll();return}
   if(action==='queue-revert'){state.queueDraft=queueAddAccounts(clone(state.queueSaved||queueFromAPI({})));state.queueDirty=false;renderKeepScroll();return}
   if(action==='queue-save'){
@@ -960,11 +1041,6 @@ document.addEventListener('change',(ev)=>{
  const el=ev.target;const d=el.dataset;
  if(el.id==='language'){state.lang=el.value;try{window.localStorage.setItem(LOCALE_STORAGE_KEY,state.lang)}catch(error){}renderKeepScroll();return}
  if(el.id==='rememberKey'){state.remember=el.checked;persistRememberKey();return}
- if(d.queueWeight!==undefined){
-  const weight=Number(el.value),entry=state.queueDraft&&state.queueDraft.entries.find(item=>item.auth_id===d.queueWeight);
-  if(!entry)return;
-  if(!Number.isInteger(weight)||weight<1||weight>10){el.setCustomValidity(tr('权重只能是 1–10 的整数','Weight must be an integer from 1 to 10'));el.reportValidity();return}
-  el.setCustomValidity('');entry.weight=weight;state.queueDirty=true;return}
  if(d.setting&&el.type==='checkbox'){
   if(['probe_unconfirmed_roster','managed_disable'].includes(d.setting)&&el.checked&&!window.confirm(tr('此选项存在风险：可能使用过期账号列表探测，或写宿主认证文件。确认启用？','This option can probe with a stale roster or modify CPA auth files. Enable it?'))){el.checked=false;return}
   state.settingsDraft[d.setting]=el.checked;state.settingsDirty=true;renderKeepScroll();return}
@@ -1018,7 +1094,7 @@ function syncSavebarDirty(){
   if(warning)save.title=warning;else save.removeAttribute('title');
  });
 }
-window.addEventListener('hashchange',()=>{if(!['overview','queue','logs','settings','retry'].includes(location.hash.slice(1)))history.replaceState(null,'','#overview');render();window.scrollTo({top:0,behavior:'instant'})});
+window.addEventListener('hashchange',()=>{if(!['overview','queue','logs','settings','retry'].includes(location.hash.slice(1)))history.replaceState(null,'','#overview');render();window.scrollTo({top:0,behavior:'instant'});if(state.loaded&&getRoute()==='queue')loadQueueWeights().then(renderKeepScroll)});
 if(!['overview','queue','logs','settings','retry'].includes(location.hash.slice(1)))history.replaceState(null,'','#overview');
 state.lang=detectLocale();
 restoreRememberedManagementKey();

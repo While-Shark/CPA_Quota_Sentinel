@@ -71,7 +71,7 @@ func schedulerPickPublished(req pluginapi.SchedulerPickRequest, now time.Time) P
 	}
 	candidates := make([]Candidate, 0, len(req.Candidates))
 	for _, c := range req.Candidates {
-		candidates = append(candidates, Candidate{ID: c.ID, Provider: c.Provider, Status: c.Status})
+		candidates = append(candidates, Candidate{ID: c.ID, Provider: c.Provider, Status: c.Status, Attributes: c.Attributes, Metadata: c.Metadata})
 	}
 	result := selectAccountSkipping(*snapshot, candidates, now, nil, snapshot.Trials)
 	var skipped map[AuthInstanceID]struct{}
