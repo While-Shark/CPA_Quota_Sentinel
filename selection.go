@@ -59,7 +59,11 @@ type AccountView struct {
 	QuotaPressure         float64
 }
 
-type Candidate struct{ ID, Provider, Status string }
+type Candidate struct {
+	ID, Provider, Status string
+	Attributes           map[string]string
+	Metadata             map[string]any
+}
 
 type SelectionResult struct {
 	AuthID         string

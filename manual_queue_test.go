@@ -27,7 +27,11 @@ func testManualQueueSnapshot() SchedulerSnapshot {
 }
 
 func queueTestCandidates() []Candidate {
-	return []Candidate{{ID: "a", Provider: "codex"}, {ID: "b", Provider: "codex"}, {ID: "c", Provider: "codex"}}
+	return []Candidate{
+		{ID: "a", Provider: "codex", Attributes: map[string]string{"weight": "2"}},
+		{ID: "b", Provider: "codex", Attributes: map[string]string{"weight": "1"}},
+		{ID: "c", Provider: "codex", Attributes: map[string]string{"weight": "3"}},
+	}
 }
 
 func TestManualQueueWeightedRoundRobin(t *testing.T) {
@@ -212,6 +216,8 @@ func TestManualQueueStatusPreviewTracksRotation(t *testing.T) {
 	state := StateSnapshot{Annotations: AnnotationState{Queue: ManualQueueConfig{
 		Mode: QueueModeManual, Entries: []ManualQueueEntry{{AuthID: "a", Weight: 2}, {AuthID: "b", Weight: 1}},
 	}}, QueueRotation: &ManualQueueRotation{}}
+	observedUpstreamWeights.ObserveCandidate(pluginapi.SchedulerAuthCandidate{ID: "a", Attributes: map[string]string{"weight": "2"}})
+	observedUpstreamWeights.ObserveCandidate(pluginapi.SchedulerAuthCandidate{ID: "b", Attributes: map[string]string{"weight": "1"}})
 	ordered := []ScheduledAccount{
 		{AuthID: "a", Available: true, selectionClass: Preferred, selectionView: AccountView{ID: "a"}},
 		{AuthID: "b", Available: true, selectionClass: Preferred, selectionView: AccountView{ID: "b"}},

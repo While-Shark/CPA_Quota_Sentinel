@@ -212,6 +212,7 @@ type StatusGroup struct {
 }
 
 type StatusWindow struct {
+	HasUsagePercent  bool       `json:"has_usage_percent"`
 	Kind             WindowKind `json:"kind,omitempty"`
 	Label            string     `json:"label"`
 	UsedPercent      float64    `json:"used_percent"`
@@ -252,6 +253,7 @@ func registerManagementWithConfig(cfg Config) pluginapi.ManagementRegistrationRe
 			{Method: http.MethodGet, Path: managementBasePath + "/annotations", Description: "Read quota annotations."},
 			{Method: http.MethodPut, Path: managementBasePath + "/annotations", Description: "Replace quota annotations."},
 			{Method: http.MethodGet, Path: managementBasePath + "/queue", Description: "Read scheduling queue mode, order and weights."},
+			{Method: http.MethodGet, Path: managementBasePath + "/queue/weights", Description: "Read sanitised upstream CPA credential weights."},
 			{Method: http.MethodPut, Path: managementBasePath + "/queue", Description: "Save manual scheduling queue."},
 			{Method: http.MethodPatch, Path: managementBasePath + "/annotations/account", Description: "Update one account annotation."},
 			{Method: http.MethodPatch, Path: managementBasePath + "/annotations/group", Description: "Update one group annotation."},
@@ -319,6 +321,8 @@ func handleManagementRequest(store *PluginState, req pluginapi.ManagementRequest
 		return jsonManagementResponse(http.StatusOK, store.Annotations())
 	case method == http.MethodGet && path == "/queue":
 		return jsonManagementResponse(http.StatusOK, store.Annotations().Queue)
+	case method == http.MethodGet && path == "/queue/weights":
+		return handleGetQueueWeights(ABIHostClient{})
 	case method == http.MethodPut && path == "/queue":
 		return handlePutManualQueue(store, req, now)
 	case method == http.MethodPut && path == "/annotations":
@@ -1054,6 +1058,7 @@ func statusWindow(window *QuotaWindow, label string) StatusWindow {
 		displayText = "已用完"
 	}
 	return StatusWindow{
+		HasUsagePercent:  hasUsagePercent,
 		Kind:             window.Kind,
 		Label:            label,
 		UsedPercent:      used,

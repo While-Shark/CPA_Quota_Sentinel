@@ -103,7 +103,7 @@ func PickCodexAccount(req pluginapi.SchedulerPickRequest, snapshot StateSnapshot
 		published := schedulerSnapshotFromState(snapshot, nil)
 		candidates := make([]Candidate, 0, len(req.Candidates))
 		for _, candidate := range req.Candidates {
-			candidates = append(candidates, Candidate{ID: candidate.ID, Provider: candidate.Provider, Status: candidate.Status})
+			candidates = append(candidates, Candidate{ID: candidate.ID, Provider: candidate.Provider, Status: candidate.Status, Attributes: candidate.Attributes, Metadata: candidate.Metadata})
 		}
 		if result := selectManualAccount(*published, candidates, now, nil, nil, true); result.AuthID != "" {
 			return PickDecision{AuthID: result.AuthID, Handled: true, Reason: "selected", Ordered: ordered}

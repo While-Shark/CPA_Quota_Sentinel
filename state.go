@@ -15,6 +15,7 @@ type PluginState struct {
 	cpaAdmissionVersion uint64
 	annotations         AnnotationState
 	queueRotation       *ManualQueueRotation
+	providerRotations   *ProviderQueueRotations
 	logs                []LogEntry
 	lastSelected        string
 	lastReason          string
@@ -25,10 +26,11 @@ type PluginState struct {
 
 func NewPluginState(cfg Config) *PluginState {
 	return &PluginState{
-		cfg:           NormalizeConfig(cfg),
-		accounts:      make(map[string]AccountState),
-		annotations:   NormalizeAnnotationState(AnnotationState{}),
-		queueRotation: &ManualQueueRotation{},
+		cfg:               NormalizeConfig(cfg),
+		accounts:          make(map[string]AccountState),
+		annotations:       NormalizeAnnotationState(AnnotationState{}),
+		queueRotation:     &ManualQueueRotation{},
+		providerRotations: &ProviderQueueRotations{},
 	}
 }
 
@@ -43,6 +45,7 @@ func (s *PluginState) cloneForLegacyTransaction() *PluginState {
 	out.cpaAdmissionVersion = s.cpaAdmissionVersion
 	out.annotations = cloneAnnotationState(s.annotations)
 	out.queueRotation = s.queueRotation
+	out.providerRotations = s.providerRotations
 	out.logs = cloneLogs(s.logs)
 	out.lastSelected, out.lastReason, out.lastCodexActivityAt, out.lastAuthScanAt, out.codexAuthCount = s.lastSelected, s.lastReason, s.lastCodexActivityAt, s.lastAuthScanAt, s.codexAuthCount
 	return out
@@ -93,6 +96,7 @@ func (s *PluginState) SetAnnotations(state AnnotationState) {
 	if manualQueueSignature(s.annotations.Queue.Entries) != manualQueueSignature(next.Queue.Entries) ||
 		s.annotations.Queue.Mode != next.Queue.Mode {
 		s.queueRotation.Reset()
+		s.providerRotations.Reset()
 	}
 	s.annotations = next
 }

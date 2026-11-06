@@ -33,6 +33,19 @@ func handlePutManualQueue(store *PluginState, req pluginapi.ManagementRequest, n
 
 // Status previews inspect the cursor without spending a slot. The same
 // highest selectable class/tier rule used in real picks remains in force.
+func handleGetQueueWeights(host HostClient) pluginapi.ManagementResponse {
+	weights, err := loadUpstreamWeights(host, observedUpstreamWeights.Snapshot())
+	if err == nil {
+		observedUpstreamWeights.MergeHostWeights(weights)
+	}
+	payload := map[string]any{"weights": weights}
+	if err != nil {
+		// Never include host errors, auth-file JSON or credential paths.
+		payload["warning"] = "CPA 上游权重读取暂不可用；仅展示已观测权重"
+	}
+	return jsonManagementResponse(http.StatusOK, payload)
+}
+
 func nextManualStatusAuthID(snapshot StateSnapshot, ordered []ScheduledAccount) string {
 	bestClass, bestPriority := Excluded, 0
 	allowed := make(map[string]AccountView)
@@ -52,6 +65,14 @@ func nextManualStatusAuthID(snapshot StateSnapshot, ordered []ScheduledAccount) 
 		}
 	}
 	entries := effectiveManualQueue(snapshot.Annotations.Queue, ids)
+	weights := observedUpstreamWeights.Snapshot()
+	for i := range entries {
+		if w, exists := weights[entries[i].AuthID]; exists {
+			entries[i].Weight = int(w.Weight)
+		} else {
+			entries[i].Weight = 1
+		}
+	}
 	if next, ok := snapshot.QueueRotation.Choose(entries, allowed, false); ok {
 		return next.ID
 	}

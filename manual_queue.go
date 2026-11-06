@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
 const (
@@ -142,7 +144,7 @@ func (r *ManualQueueRotation) Choose(entries []ManualQueueEntry, allowed map[str
 	}
 	if r == nil {
 		for _, e := range entries {
-			if a, ok := allowed[e.AuthID]; ok {
+			if a, ok := allowed[e.AuthID]; ok && e.Weight > 0 {
 				return a, true
 			}
 		}
@@ -157,7 +159,7 @@ func (r *ManualQueueRotation) Choose(entries []ManualQueueEntry, allowed map[str
 	}
 	for tries := 0; tries < len(entries); tries++ {
 		e := entries[index]
-		if a, ok := allowed[e.AuthID]; ok {
+		if a, ok := allowed[e.AuthID]; ok && e.Weight > 0 {
 			if remaining == 0 {
 				remaining = e.Weight
 			}
@@ -181,6 +183,7 @@ func (r *ManualQueueRotation) Choose(entries []ManualQueueEntry, allowed map[str
 // currently selectable CPA tier and availability class.
 func selectManualAccount(snapshot SchedulerSnapshot, candidates []Candidate, now time.Time, skip map[AuthInstanceID]struct{}, trials *TrialRegistry, advance bool) SelectionResult {
 	admitted := make(map[string]struct{}, len(candidates))
+	byID := make(map[string]pluginapi.SchedulerAuthCandidate, len(candidates))
 	for _, c := range candidates {
 		if c.ID == "" || c.Provider != "codex" {
 			continue
@@ -190,7 +193,12 @@ func selectManualAccount(snapshot SchedulerSnapshot, candidates []Candidate, now
 			continue
 		}
 		if _, ok := snapshot.ActiveHighestTier[c.ID]; ok {
+			weight := observedUpstreamWeights.WeightForCandidate(pluginapi.SchedulerAuthCandidate{ID: c.ID, Provider: c.Provider, Attributes: c.Attributes, Metadata: c.Metadata})
+			if weight.Weight <= 0 {
+				continue
+			}
 			admitted[c.ID] = struct{}{}
+			byID[c.ID] = pluginapi.SchedulerAuthCandidate{ID: c.ID, Provider: c.Provider, Attributes: c.Attributes, Metadata: c.Metadata}
 		}
 	}
 	bestClass, bestPriority := Excluded, 0
@@ -225,7 +233,7 @@ func selectManualAccount(snapshot SchedulerSnapshot, candidates []Candidate, now
 	if len(allowed) == 0 {
 		return SelectionResult{Reason: "no_selectable_account", Fallback: snapshot.Fallback == FallbackFillFirst}
 	}
-	entries := effectiveManualQueue(snapshot.Queue, ids)
+	entries := weightedEntriesFromCandidates(effectiveManualQueue(snapshot.Queue, ids), byID)
 	a, ok := snapshot.Rotation.Choose(entries, allowed, advance)
 	if !ok {
 		return SelectionResult{Reason: "no_selectable_account", Fallback: snapshot.Fallback == FallbackFillFirst}

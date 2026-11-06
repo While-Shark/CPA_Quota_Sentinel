@@ -8,6 +8,17 @@ Earlier releases (v0.1.0 – v0.2.1) predate this file; see the
 [GitHub releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 page for them.
 
+## [v0.4.12] - 2026-11-06
+
+### Added and improved
+- Expand the manual account rotation queue to all discovered CPA auth providers, including Codex, Claude, Antigravity, and xAI. Each provider/model rotates only among candidates supplied for that request; automatic mode is unchanged.
+- Read **native CPA credential weights** from runtime candidate attributes/metadata with a read-only auth-file fallback. Omitted weight defaults to CPA's 1, while weight 0 excludes an account from manual weighted routing. Legacy plugin-local weights no longer control routing; manual order remains editable.
+- Show real five-hour, weekly/monthly, and provider model-pool quota windows alongside each queue entry. Missing windows or missing actual usage percentages are reported as unknown, never fabricated. Sort by CPA weight or refresh upstream weights on demand.
+
+### Safety and regression coverage
+- Preserve CPA priority, disabled/auth-failed state, quota protection and circuit-breaker exclusions; forbid incompatible cross-model account selection and fail closed when the manual queue has no eligible accounts.
+- Add tests for CPA weight precedence and limits, safe read-only credential metadata handling, isolated provider rotation, zero-weight exclusions, weekly-only quotas, and unknown percentage display.
+
 ## [v0.4.11] - 2026-11-06
 
 ### Added
