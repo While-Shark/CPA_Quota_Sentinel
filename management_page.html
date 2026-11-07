@@ -205,6 +205,11 @@ code,.mono,.number{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation 
 .unit-control select{border-radius:0 7px 7px 0;border-left:none;width:55%;padding-left:6px}
 .settings-footnote{padding:12px 18px;border-top:1px solid #f3d597;background:var(--warning-wash);font-size:11px;color:#93640b}
 .settings-savebar{position:relative;bottom:auto;z-index:1;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:13px 17px;margin-top:18px;border-radius:12px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow)}
+/* Queue and scheduling settings keep their single, real savebar visible while scrolling. */
+.settings-savebar-floating{position:sticky;bottom:calc(12px + env(safe-area-inset-bottom, 0px));z-index:12;box-shadow:var(--shadow-raised);border-color:var(--line);isolation:isolate}
+.settings-savebar-floating .dirty-label{min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.settings-savebar-floating .toolbar-actions{flex:none}
+.workspace.workspace-with-floating-savebar{padding-bottom:calc(76px + env(safe-area-inset-bottom, 0px))}
 .dirty-label{font-size:11px;color:var(--muted)}
 .dirty-label strong{color:#b47809}
 .retry-top{padding:19px;margin-bottom:17px}
@@ -291,6 +296,18 @@ code,.mono,.number{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation 
 @media(max-width:620px){.accounts-grid,.metrics{grid-template-columns:1fr}.metrics{gap:9px}.metric{min-height:68px}.page-header{align-items:flex-start}.header-status{font-size:10px}.header-status .demo-tag{display:none}.setting-row{grid-template-columns:1fr;gap:9px}.setting-control{justify-content:flex-start}.retry-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.advanced-grid{grid-template-columns:1fr}.retry-event{grid-template-columns:1fr}.modal-form-grid{grid-template-columns:1fr}.toolbar{align-items:flex-start}.settings-savebar{flex-direction:column;align-items:stretch}.settings-savebar .toolbar-actions{justify-content:flex-end}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 
+
+@media(max-width:620px){
+ .settings-savebar-floating{bottom:calc(8px + env(safe-area-inset-bottom, 0px));padding:10px 12px;gap:7px}
+ .settings-savebar-floating .dirty-label{font-size:10px;line-height:1.5}
+ .settings-savebar-floating .toolbar-actions{display:flex;justify-content:flex-end;gap:6px}
+ .settings-savebar-floating .toolbar-actions .btn{flex:1 1 auto;min-width:0;min-height:38px;padding:7px 8px;font-size:11px}
+ .workspace.workspace-with-floating-savebar{padding-bottom:calc(152px + env(safe-area-inset-bottom, 0px))}
+}
+@media(max-width:380px){
+ .settings-savebar-floating .toolbar-actions{flex-wrap:wrap}
+ .workspace.workspace-with-floating-savebar{padding-bottom:calc(185px + env(safe-area-inset-bottom, 0px))}
+}
 
 /* Manual rotation queue */
 .queue-settings{padding:23px 25px;margin-bottom:17px}
@@ -737,7 +754,7 @@ function renderQueue(){
  <section class="panel queue-list-panel"><div class="queue-list-heading"><div><h2>${tr('账号顺序与权重','Account order and weights')} (${q.entries.length})</h2><p>${tr('拖动调整，也可使用置顶、上移、下移按钮','Drag to reorder, or use the buttons.')}</p></div><div class="toolbar-actions">${button('queue-refresh-weights',ic('refresh',13)+tr('读取 CPA 权重','Sync CPA weights'),'btn-sm')}${button('queue-sort-weight',tr('按权重降序','Sort by weight'),'btn-sm')}${button('queue-auto-order',tr('恢复自动排序','Use automatic order'),'btn-sm')}</div></div>
   ${state.upstreamWeightWarning?`<p class="queue-hint queue-weight-warning">${E(state.upstreamWeightWarning)}</p>`:''}
   <ol class="queue-list">${rows||tr('暂无认证账号，请先刷新上游 AUTH 清单','No auth accounts yet. Refresh the upstream auth inventory.')}</ol></section>
- <div class="settings-savebar"><div class="dirty-label">${state.queueDirty?`<strong>● ${tr('有未保存的修改','Unsaved changes')}</strong>`:tr('队列已保存','Queue saved')} · ${tr('下一账号','Next account')}: <strong>${E(state.nextId||'—')}</strong></div><div class="toolbar-actions">${button('queue-revert',tr('撤销修改','Discard changes'))}${button('queue-save',ic('check',15)+tr('保存并应用','Save and apply'),'btn-primary')}</div></div>`;
+ <div class="settings-savebar settings-savebar-floating" role="region" aria-label="${tr('队列保存操作','Queue save actions')}"><div class="dirty-label">${state.queueDirty?`<strong>● ${tr('有未保存的修改','Unsaved changes')}</strong>`:tr('队列已保存','Queue saved')} · ${tr('下一账号','Next account')}: <strong>${E(state.nextId||'—')}</strong></div><div class="toolbar-actions">${button('queue-revert',tr('撤销修改','Discard changes'))}${button('queue-save',ic('check',15)+tr('保存并应用','Save and apply'),'btn-primary')}</div></div>`;
 }
 
 /* ---- render: logs ---- */
@@ -851,11 +868,11 @@ function renderSettings(){
  const columns=[[SETTING_GROUPS[2],SETTING_GROUPS[0],SETTING_GROUPS[1]],[SETTING_GROUPS[3],SETTING_GROUPS[4],SETTING_GROUPS[5]]];
  return `${renderHeader(tr('调度设置','Scheduling settings'),tr('配置调度策略、刷新周期与故障恢复机制','Configure scheduling strategies, refresh intervals and recovery'))}
  ${rosterWarning()}
-    <div class="banner blue settings-note">${ic('info',18)}<div><strong>${tr('默认配置已经过优化','Defaults are already optimized')}</strong><p>${tr('正常情况下无需手动调整；如有修改，请在页面底部保存设置。','Most installations require no manual tuning. Remember to save changes at the bottom.')}</p></div></div>
+    <div class="banner blue settings-note">${ic('info',18)}<div><strong>${tr('默认配置已经过优化','Defaults are already optimized')}</strong><p>${tr('正常情况下无需手动调整；修改后可直接通过底部悬浮栏保存设置。','Most installations require no manual tuning. Save changes anytime with the floating bar at the bottom.')}</p></div></div>
  <div class="banner blue settings-note">${ic('info',18)}<div><strong>${tr('当前后台路径','Current management path')}</strong><div class="management-entry-row"><code>${E(managementPath())}</code><a class="btn btn-sm" href="${E(resourceStatusPath())}" target="_blank" rel="noopener noreferrer">${tr('打开后台','Open management')}</a></div><p>${tr('未自定义时使用默认路径；可在 CPA 的插件配置中修改。后台仍需要 CPA 管理密钥。','The default path is used unless customized in CPA plugin configuration. The admin key remains required.')}</p></div></div>
  ${state.loaded&&!state.settingsDraft.activate_new_reset?`<div class="banner">${ic('alert',18)}<div><strong>${tr('自动激活新的额度周期：当前已关闭','Automatic activation of new quota windows is off')}</strong><p>${tr('额度重置后只进行只读检查，不会主动发起激活请求；打开可能消耗少量额度。','After quota reset, the scheduler only performs read-only checks; activation can consume quota.')}</p></div></div>`:''}
  <div class="settings-grid">${columns.map(column=>`<div class="settings-col">${column.map(settingsGroup).join('')}</div>`).join('')}</div>
- <div class="settings-savebar"><div class="dirty-label">${state.settingsDirty?`<strong>● ${tr('有未保存的设置修改','Unsaved scheduling changes')}</strong>`:tr('当前设置已保存','Scheduling settings are saved')} · ${tr('与重试链设置独立保存','Saved independently from retry settings')}</div><div class="toolbar-actions">${button('export-settings',ic('download',14)+tr('导出配置','Export settings'))}${button('import-settings',ic('upload',14)+tr('导入配置','Import settings'))}${button('save-settings',ic('check',14)+tr('保存设置','Save settings'),'btn-primary',protectionThresholdWarning(state.settingsDraft)?'disabled aria-disabled="true"':'')}</div></div>`;
+ <div class="settings-savebar settings-savebar-floating" role="region" aria-label="${tr('调度设置保存操作','Scheduling save actions')}"><div class="dirty-label">${state.settingsDirty?`<strong>● ${tr('有未保存的设置修改','Unsaved scheduling changes')}</strong>`:tr('当前设置已保存','Scheduling settings are saved')} · ${tr('与重试链设置独立保存','Saved independently from retry settings')}</div><div class="toolbar-actions">${button('export-settings',ic('download',14)+tr('导出配置','Export settings'))}${button('import-settings',ic('upload',14)+tr('导入配置','Import settings'))}${button('save-settings',ic('check',14)+tr('保存设置','Save settings'),'btn-primary',protectionThresholdWarning(state.settingsDraft)?'disabled aria-disabled="true"':'')}</div></div>`;
 }
 /* ---- render: retry ---- */
 function chainMarkup(chain,index){
@@ -916,7 +933,7 @@ function renderNotLoaded(){return `<div class="not-loaded"><div class="panel emp
 function render(){
  state.route=getRoute();document.documentElement.lang=state.lang==='en'?'en':'zh-CN';
  const content=state.loaded?({overview:renderOverview,queue:renderQueue,logs:renderLogs,settings:renderSettings,retry:renderRetry}[state.route]||renderOverview)():renderNotLoaded();
- document.getElementById('app').innerHTML=`<div class="app-shell">${renderSidebar()}<main id="main" class="workspace" tabindex="-1">${content}</main></div>`;
+ document.getElementById('app').innerHTML=`<div class="app-shell">${renderSidebar()}<main id="main" class="workspace${state.loaded&&['queue','settings'].includes(state.route)?' workspace-with-floating-savebar':''}" tabindex="-1">${content}</main></div>`;
 }
 function renderKeepScroll(){
  const y=window.scrollY;const advancedOpen=document.getElementById('advancedPanel')?.open||false;
