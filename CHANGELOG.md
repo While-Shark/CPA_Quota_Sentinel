@@ -8,6 +8,16 @@ Earlier releases (v0.1.0 – v0.2.1) predate this file; see the
 [GitHub releases](https://github.com/JefferyZhang2019/cpa-plugin-codex-quota-scheduler/releases)
 page for them.
 
+## [v0.4.13] - 2026-11-07
+
+### User interface
+- Keep the existing "Discard changes / Save and apply" actions on the account rotation queue and "Export / Import / Save settings" actions on the scheduling settings page visible in a bottom-floating sticky toolbar while scrolling.
+- Preserve original save handlers and unsaved status. Add bottom spacing, mobile and safe-area support to prevent controls from hiding page content. The model retry-chain page remains unchanged.
+- Update scheduling settings guidance to mention the floating save bar.
+
+### Verification
+- Add regression coverage for the savebar scope and structure. Verify Go tests, static checks, management JavaScript syntax, and desktop/mobile scrolling layouts in Chrome.
+
 ## [v0.4.12] - 2026-11-06
 
 ### Added and improved

@@ -51,10 +51,10 @@ func TestProbeOnProvisionalRosterIsExplicitRiskOption(t *testing.T) {
 	}
 }
 
-func TestPluginRegistrationUsesV0412SourceVersion(t *testing.T) {
+func TestPluginRegistrationUsesV0413SourceVersion(t *testing.T) {
 	reg := PluginRegistration()
-	if got := reg.Metadata.Version; got != "0.4.12" {
-		t.Fatalf("plugin registration version = %q, want 0.4.12", got)
+	if got := reg.Metadata.Version; got != "0.4.13" {
+		t.Fatalf("plugin registration version = %q, want 0.4.13", got)
 	}
 	if reg.Metadata.Name != "CPA_Quota_Sentinel" {
 		t.Fatalf("plugin registration name = %q, want CPA_Quota_Sentinel", reg.Metadata.Name)
@@ -66,12 +66,12 @@ func TestReleaseVersionMetadataConsistent(t *testing.T) {
 		path string
 		want []string
 	}{
-		{"config.go", []string{`var pluginVersion = "0.4.12"`}},
-		{"Makefile", []string{"VERSION ?= 0.4.12"}},
-		{"CHANGELOG.md", []string{"## [v0.4.12] - 2026-11-06"}},
-		{"CHANGELOG.zh-CN.md", []string{"## [v0.4.12] - 2026-11-06"}},
-		{"README.md", []string{"make package VERSION=0.4.12", "make checksums VERSION=0.4.12", "git tag -a v0.4.12 -m \"v0.4.12\"", "git push origin v0.4.12", "[CHANGELOG.md](CHANGELOG.md)"}},
-		{"README.zh-CN.md", []string{"make package VERSION=0.4.12", "make checksums VERSION=0.4.12", "git tag -a v0.4.12 -m \"v0.4.12\"", "git push origin v0.4.12", "[CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)"}},
+		{"config.go", []string{`var pluginVersion = "0.4.13"`}},
+		{"Makefile", []string{"VERSION ?= 0.4.13"}},
+		{"CHANGELOG.md", []string{"## [v0.4.13] - 2026-11-07"}},
+		{"CHANGELOG.zh-CN.md", []string{"## [v0.4.13] - 2026-11-07"}},
+		{"README.md", []string{"make package VERSION=0.4.13", "make checksums VERSION=0.4.13", "git tag -a v0.4.13 -m \"v0.4.13\"", "git push origin v0.4.13", "[CHANGELOG.md](CHANGELOG.md)"}},
+		{"README.zh-CN.md", []string{"make package VERSION=0.4.13", "make checksums VERSION=0.4.13", "git tag -a v0.4.13 -m \"v0.4.13\"", "git push origin v0.4.13", "[CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)"}},
 	} {
 		contents, err := os.ReadFile(check.path)
 		if err != nil {
